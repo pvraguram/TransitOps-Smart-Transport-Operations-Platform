@@ -20,15 +20,14 @@ class Vehicle(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     registration_number = Column(String, unique=True, index=True, nullable=False)
-    name_model = Column(String, nullable=False)
-    type = Column(String, nullable=False) # e.g. Van, Truck
-    max_load_capacity = Column(Float, nullable=False) # in kg
-    odometer = Column(Integer, default=0)
-    acquisition_cost = Column(Float, default=0.0)
+    max_load_capacity = Column(Float, default=0.0)
+    type_id = Column(Integer, ForeignKey("vehicle_types.id"), nullable=False)
     status = Column(SQLEnum(VehicleStatus, name="vehiclestatus"), default=VehicleStatus.available, nullable=False)
-    region_id = Column(Integer, ForeignKey("regions.id"), nullable=True) # Optional link if you use regions
+    mileage = Column(Integer, default=0)
+    region_id = Column(Integer, ForeignKey("regions.id"), nullable=False)
 
     # Relationships
+    type = relationship("VehicleType")
     region = relationship("Region")
     trips = relationship("Trip", back_populates="vehicle")
     maintenance_records = relationship("MaintenanceRecord", back_populates="vehicle")
@@ -41,14 +40,13 @@ class Driver(Base):
     first_name = Column(String, nullable=False)
     last_name = Column(String, nullable=False)
     license_number = Column(String, unique=True, index=True, nullable=False)
-    license_category = Column(String, nullable=False)
-    license_expiry_date = Column(Date, nullable=False)
-    contact_number = Column(String, nullable=False)
-    safety_score = Column(Integer, default=100)
+    license_expiry_date = Column(Date)
+    license_category_id = Column(Integer, ForeignKey("license_categories.id"), nullable=False)
     status = Column(SQLEnum(DriverStatus, name="driverstatus"), default=DriverStatus.available, nullable=False)
-    region_id = Column(Integer, ForeignKey("regions.id"), nullable=True)
+    region_id = Column(Integer, ForeignKey("regions.id"), nullable=False)
 
     # Relationships
+    license_category = relationship("LicenseCategory")
     region = relationship("Region")
     trips = relationship("Trip", back_populates="driver")
 
@@ -58,13 +56,12 @@ class Trip(Base):
     id = Column(Integer, primary_key=True, index=True)
     vehicle_id = Column(Integer, ForeignKey("vehicles.id"), nullable=False)
     driver_id = Column(Integer, ForeignKey("drivers.id"), nullable=False)
+    cargo_weight = Column(Float)
     start_time = Column(DateTime)
     end_time = Column(DateTime)
     status = Column(SQLEnum(TripStatus, name="tripstatus"), default=TripStatus.draft, nullable=False)
     origin = Column(String, nullable=False)
     destination = Column(String, nullable=False)
-    cargo_weight = Column(Float, nullable=False)
-    planned_distance = Column(Float, nullable=False)
 
     # Relationships
     vehicle = relationship("Vehicle", back_populates="trips")
@@ -91,7 +88,7 @@ class FuelLog(Base):
     id = Column(Integer, primary_key=True, index=True)
     vehicle_id = Column(Integer, ForeignKey("vehicles.id"), nullable=False)
     date = Column(Date, nullable=False)
-    liters = Column(Float, nullable=False)
+    gallons = Column(Float, nullable=False)
     cost = Column(Float, nullable=False)
     odometer_reading = Column(Integer)
 
