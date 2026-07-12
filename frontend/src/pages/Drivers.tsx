@@ -39,27 +39,28 @@ export default function Drivers() {
 
       {/* Drivers table */}
       <DataTable<Driver>
-        data={filteredDrivers}
-        keyExtractor={(d) => d.id}
-        emptyMessage="No drivers match your search/filter."
-        columns={[
-          { header: "Driver", accessor: (d) => <span className="font-medium text-[#1D1A39]">{d.name}</span> },
-          { header: "License No.", accessor: (d) => d.licenseNo },
-          { header: "Category", accessor: (d) => d.category },
-          {
-            header: "Expiry",
-            accessor: (d) => (
-              <span className={d.expired ? "text-[#AE445A] font-medium" : "text-[#1D1A39]"}>
-                {d.expiry}{d.expired ? " EXPIRED" : ""}
-              </span>
-            ),
-          },
-          { header: "Contact", accessor: (d) => d.contact, className: "text-[#451952]/70" },
-          { header: "Trip Compl.", accessor: (d) => `${d.tripCompletion}%` },
-          { header: "Safety", accessor: (d) => <StatusBadge status={d.safety} /> },
-          { header: "Status", accessor: (d) => <StatusBadge status={d.status} /> },
-        ]}
-      />
+  data={filteredDrivers}
+  keyField="id"
+  emptyMessage="No drivers match your search/filter."
+  columns={[
+    { key: "name", header: "Driver", render: (d) => <span className="font-medium text-[#1D1A39]">{d.name}</span> },
+    { key: "licenseNo", header: "License No.", accessor: (d) => d.licenseNo },
+    { key: "category", header: "Category", accessor: (d) => d.category },
+    {
+      key: "expiry",
+      header: "Expiry",
+      render: (d) => (
+        <span className={d.expired ? "text-[#AE445A] font-medium" : "text-[#1D1A39]"}>
+          {d.expiry}{d.expired ? " EXPIRED" : ""}
+        </span>
+      ),
+    },
+    { key: "contact", header: "Contact", render: (d) => <span className="text-[#451952]/70">{d.contact}</span> },
+    { key: "tripCompletion", header: "Trip Compl.", accessor: (d) => `${d.tripCompletion}%` },
+    { key: "safety", header: "Safety", render: (d) => <StatusBadge status={d.safety} /> },
+    { key: "status", header: "Status", render: (d) => <StatusBadge status={d.status} /> },
+  ]}
+/>
 
       {/* Toggle status filter chips */}
       <div className="flex gap-2">
