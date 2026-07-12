@@ -1,1 +1,61 @@
-﻿
+﻿/* src/index.css */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Base app styles */
+html, body, #root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: 'Inter', system-ui, sans-serif;
+  background-color: #F8FAFC;
+  color: #1D1A39;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Custom scrollbar to match theme */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background-color: #E8BCB9;
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background-color: #F39F5A;
+}
+
+/* Reusable utility classes referenced across pages */
+@layer components {
+  .card {
+    @apply bg-white border border-[#E8BCB9] rounded-xl;
+  }
+
+  .badge {
+    @apply px-2.5 py-1 rounded-full text-xs font-medium inline-block;
+  }
+
+  .table-header {
+    @apply text-left text-[#451952]/70 border-b border-[#E8BCB9] bg-[#E8BCB9]/20;
+  }
+
+  .input-base {
+    @apply text-sm border border-[#662549]/30 rounded-lg px-3 py-2 
+           focus:outline-none focus:ring-2 focus:ring-[#F39F5A];
+  }
+
+  .btn-primary {
+    @apply bg-[#F39F5A] hover:bg-[#e8944f] text-[#1D1A39] font-medium 
+           text-sm px-4 py-2 rounded-lg transition-colors;
+  }
+}

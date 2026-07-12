@@ -1,50 +1,23 @@
-﻿import { LucideIcon } from "lucide-react";
+﻿// src/components/KpiCard.tsx
+import type { Kpi } from "../types";
 
 interface KpiCardProps {
-  label: string;
-  value: string | number;
-  icon?: LucideIcon;
-  trend?: string;
-  trendDirection?: "up" | "down" | "neutral";
-  emphasis?: boolean; // dark variant, e.g. for a "total" card
+  kpi: Kpi;
 }
 
-export default function KpiCard({
-  label,
-  value,
-  icon: Icon,
-  trend,
-  trendDirection = "neutral",
-  emphasis = false,
-}: KpiCardProps) {
-  const trendColor =
-    trendDirection === "up"
-      ? "text-emerald-500"
-      : trendDirection === "down"
-      ? "text-[#AE445A]"
-      : "text-[#662549]/60";
-
-  if (emphasis) {
-    return (
-      <div className="bg-[#1D1A39] rounded-xl p-4 shadow-sm">
-        <div className="flex items-center gap-2 text-[#F39F5A] text-xs font-semibold uppercase">
-          {Icon && <Icon className="w-4 h-4" />}
-          {label}
-        </div>
-        <p className="text-2xl font-bold text-white mt-2">{value}</p>
-        {trend && <p className={`text-xs mt-1 ${trendColor}`}>{trend}</p>}
-      </div>
-    );
-  }
+export default function KpiCard({ kpi }: KpiCardProps) {
+  const valueColor =
+    kpi.accent === "rose" ? "text-[#AE445A]" :
+    kpi.accent === "orange" ? "text-[#F39F5A]" :
+    kpi.accent === "wine" ? "text-[#662549]" :
+    "text-[#1D1A39]";
 
   return (
-    <div className="bg-white rounded-xl border border-[#662549]/15 p-4 shadow-sm">
-      <div className="flex items-center gap-2 text-[#662549]/70 text-xs font-semibold uppercase">
-        {Icon && <Icon className="w-4 h-4" />}
-        {label}
-      </div>
-      <p className="text-2xl font-bold text-[#1D1A39] mt-2">{value}</p>
-      {trend && <p className={`text-xs mt-1 ${trendColor}`}>{trend}</p>}
+    <div className="bg-[#E8BCB9]/25 border border-[#E8BCB9] rounded-xl px-4 py-3 flex-1 min-w-[150px]">
+      <p className="text-xs uppercase tracking-wide text-[#451952]/70 font-medium">
+        {kpi.label}
+      </p>
+      <p className={`text-2xl font-semibold mt-1 ${valueColor}`}>{kpi.value}</p>
     </div>
   );
 }
