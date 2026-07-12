@@ -19,7 +19,8 @@ class Vehicle(Base):
     __tablename__ = "vehicles"
 
     id = Column(Integer, primary_key=True, index=True)
-    license_plate = Column(String, unique=True, index=True, nullable=False)
+    registration_number = Column(String, unique=True, index=True, nullable=False)
+    max_load_capacity = Column(Float, default=0.0)
     type_id = Column(Integer, ForeignKey("vehicle_types.id"), nullable=False)
     status = Column(SQLEnum(VehicleStatus, name="vehiclestatus"), default=VehicleStatus.available, nullable=False)
     mileage = Column(Integer, default=0)
@@ -39,6 +40,7 @@ class Driver(Base):
     first_name = Column(String, nullable=False)
     last_name = Column(String, nullable=False)
     license_number = Column(String, unique=True, index=True, nullable=False)
+    license_expiry_date = Column(Date)
     license_category_id = Column(Integer, ForeignKey("license_categories.id"), nullable=False)
     status = Column(SQLEnum(DriverStatus, name="driverstatus"), default=DriverStatus.available, nullable=False)
     region_id = Column(Integer, ForeignKey("regions.id"), nullable=False)
@@ -54,6 +56,7 @@ class Trip(Base):
     id = Column(Integer, primary_key=True, index=True)
     vehicle_id = Column(Integer, ForeignKey("vehicles.id"), nullable=False)
     driver_id = Column(Integer, ForeignKey("drivers.id"), nullable=False)
+    cargo_weight = Column(Float)
     start_time = Column(DateTime)
     end_time = Column(DateTime)
     status = Column(SQLEnum(TripStatus, name="tripstatus"), default=TripStatus.draft, nullable=False)
