@@ -1,7 +1,7 @@
-﻿import { useState } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Mail, Lock, Eye, EyeOff, Zap, ArrowRight } from "lucide-react";
-import { useAuth } from "../hooks/useAuth.tsx";
+import { useAuth } from "../hooks/useAuth";
 
 type Role = "Fleet Manager" | "Dispatcher" | "Safety Officer" | "Financial Analyst";
 
