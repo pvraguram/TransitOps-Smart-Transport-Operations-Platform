@@ -59,16 +59,16 @@ export default function Dashboard() {
             </h3>
           </div>
           <DataTable<RecentTrip>
-            data={recentTrips}
-            keyExtractor={(t) => t.id}
-            columns={[
-              { header: "Trip", accessor: (t) => <span className="font-medium text-[#1D1A39]">{t.id}</span> },
-              { header: "Vehicle", accessor: (t) => t.vehicle },
-              { header: "Driver", accessor: (t) => t.driver },
-              { header: "Status", accessor: (t) => <StatusBadge status={t.status} /> },
-              { header: "ETA", accessor: (t) => t.eta, className: "text-[#451952]/70" },
-            ]}
-          />
+  data={recentTrips}
+  keyField="id"
+  columns={[
+    { key: "trip", header: "Trip", render: (t) => <span className="font-medium text-[#1D1A39]">{t.id}</span> },
+    { key: "vehicle", header: "Vehicle", accessor: (t) => t.vehicle },
+    { key: "driver", header: "Driver", accessor: (t) => t.driver },
+    { key: "status", header: "Status", render: (t) => <StatusBadge status={t.status} /> },
+    { key: "eta", header: "ETA", render: (t) => <span className="text-[#451952]/70">{t.eta}</span> },
+  ]}
+/>
         </div>
 
         {/* Vehicle Status breakdown */}
