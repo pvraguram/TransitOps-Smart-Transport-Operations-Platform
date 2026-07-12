@@ -2,12 +2,10 @@ import { useState, useEffect } from "react";
 import { Wrench, Save, ArrowRight } from "lucide-react";
 import { maintenanceApi, vehicleApi } from "../services/api";
 
-type Status = "in_shop" | "completed" | "available";
 
 function StatusPill({ status }: { status: string }) {
   const styles: Record<string, string> = {
-    available: "bg-emerald-500/15 text-emerald-600 border border-emerald-500/30",
-    in_shop: "bg-[#F39F5A]/20 text-[#F39F5A] border border-[#F39F5A]/40",
+    active: "bg-[#F39F5A]/20 text-[#F39F5A] border border-[#F39F5A]/40",
     completed: "bg-[#451952]/10 text-[#451952] border border-[#451952]/30",
   };
   return (
@@ -20,9 +18,11 @@ function StatusPill({ status }: { status: string }) {
 export default function Maintenance() {
   const [serviceLogs, setServiceLogs] = useState<any[]>([]);
   const [vehicles, setVehicles] = useState<any[]>([]);
+  const [saving, setSaving] = useState(false);
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
 
   const [vehicleId, setVehicleId] = useState("");
-  const [serviceType, setServiceType] = useState("");
+  const [serviceType, setServiceType] = useState("routine");
   const [cost, setCost] = useState("");
   const [description, setDescription] = useState("");
 
@@ -45,28 +45,36 @@ export default function Maintenance() {
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!vehicleId || !serviceType || !cost) return;
-
+    const errors: Record<string, string> = {};
+    if (!vehicleId) errors.vehicleId = "Please select a vehicle.";
+    if (!serviceType.trim()) errors.serviceType = "Service type is required.";
+    if (!cost) errors.cost = "Cost is required.";
+    if (Object.keys(errors).length > 0) { setFormErrors(errors); return; }
+    setFormErrors({});
+    setSaving(true);
     try {
       await maintenanceApi.create({
         vehicle_id: Number(vehicleId),
-        service_type: serviceType,
+        date: new Date().toISOString().split("T")[0],
+        type: serviceType,
         cost: Number(cost),
         description: description || null
       });
       setVehicleId("");
-      setServiceType("");
+      setServiceType("routine");
       setCost("");
       setDescription("");
       loadData();
     } catch (e) {
       console.error("Failed to add maintenance record", e);
+    } finally {
+      setSaving(false);
     }
   };
 
   const handleComplete = async (id: number) => {
     try {
-      await maintenanceApi.update(id.toString(), { status: "completed" });
+      await maintenanceApi.updateStatus(id.toString(), "completed");
       loadData();
     } catch (e) {
       console.error("Failed to update status", e);
@@ -99,29 +107,34 @@ export default function Maintenance() {
                 Vehicle
               </label>
               <select
-                required
-                value={vehicleId}
-                onChange={(e) => setVehicleId(e.target.value)}
-                className="w-full px-3 py-2.5 text-sm border border-[#662549]/20 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#F39F5A]/40 bg-white"
-              >
-                <option value="">Select vehicle</option>
-                {vehicles.map((v) => (
-                  <option key={v.id} value={v.id}>{v.registration_number}</option>
-                ))}
-              </select>
+              required
+              value={vehicleId}
+              onChange={(e) => { setVehicleId(e.target.value); setFormErrors(p => ({ ...p, vehicleId: "" })); }}
+              className={`w-full px-3 py-2.5 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#F39F5A]/40 bg-white ${formErrors.vehicleId ? "border-red-400" : "border-[#662549]/20"}`}
+            >
+              <option value="">Select vehicle</option>
+              {vehicles.map((v) => (
+                <option key={v.id} value={v.id}>{v.registration_number}</option>
+              ))}
+            </select>
+            {formErrors.vehicleId && <p className="text-xs text-red-500 mt-1">{formErrors.vehicleId}</p>}
             </div>
 
             <div>
               <label className="block text-xs font-semibold text-[#662549] mb-1.5 uppercase">
                 Service Type
               </label>
-              <input
+              <select
                 required
                 value={serviceType}
-                onChange={(e) => setServiceType(e.target.value)}
-                placeholder="e.g. Oil Change"
-                className="w-full px-3 py-2.5 text-sm border border-[#662549]/20 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#F39F5A]/40"
-              />
+                onChange={(e) => { setServiceType(e.target.value); setFormErrors(p => ({ ...p, serviceType: "" })); }}
+                className={`w-full px-3 py-2.5 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#F39F5A]/40 bg-white ${formErrors.serviceType ? "border-red-400" : "border-[#662549]/20"}`}
+              >
+                <option value="routine">Routine</option>
+                <option value="repair">Repair</option>
+                <option value="inspection">Inspection</option>
+              </select>
+              {formErrors.serviceType && <p className="text-xs text-red-500 mt-1">{formErrors.serviceType}</p>}
             </div>
 
             <div>
@@ -131,11 +144,12 @@ export default function Maintenance() {
               <input
                 required
                 value={cost}
-                onChange={(e) => setCost(e.target.value)}
+                onChange={(e) => { setCost(e.target.value); setFormErrors(p => ({ ...p, cost: "" })); }}
                 type="number"
                 placeholder="0"
-                className="w-full px-3 py-2.5 text-sm border border-[#662549]/20 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#F39F5A]/40"
+                className={`w-full px-3 py-2.5 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#F39F5A]/40 ${formErrors.cost ? "border-red-400" : "border-[#662549]/20"}`}
               />
+              {formErrors.cost && <p className="text-xs text-red-500 mt-1">{formErrors.cost}</p>}
             </div>
 
             <div>
@@ -151,10 +165,11 @@ export default function Maintenance() {
 
             <button
               type="submit"
-              className="w-full flex items-center justify-center gap-2 bg-[#F39F5A] text-[#1D1A39] font-semibold text-sm py-2.5 rounded-lg hover:brightness-95 transition"
+              disabled={saving}
+              className="w-full flex items-center justify-center gap-2 bg-[#F39F5A] text-[#1D1A39] font-semibold text-sm py-2.5 rounded-lg hover:brightness-95 transition disabled:opacity-60"
             >
               <Save className="w-4 h-4" />
-              Save
+              {saving ? "Saving..." : "Save"}
             </button>
           </form>
 
@@ -203,15 +218,15 @@ export default function Maintenance() {
               {serviceLogs.map((log) => (
                 <tr key={log.id} className="border-t border-[#662549]/10 hover:bg-[#E8BCB9]/10">
                   <td className="px-5 py-3 font-medium text-[#1D1A39]">{log.vehicle_id}</td>
-                  <td className="px-5 py-3 text-[#451952]/80">{log.service_type}</td>
+                  <td className="px-5 py-3 text-[#451952]/80 capitalize">{log.type}</td>
                   <td className="px-5 py-3 font-semibold text-[#1D1A39]">
-                    ₹{log.cost.toLocaleString()}
+                    ₹{log.cost?.toLocaleString() ?? 0}
                   </td>
                   <td className="px-5 py-3">
                     <StatusPill status={log.status} />
                   </td>
                   <td className="px-5 py-3">
-                    {log.status === 'in_shop' && (
+                    {log.status === 'active' && (
                       <button onClick={() => handleComplete(log.id)} className="text-xs text-blue-600 underline">
                         Mark Done
                       </button>

@@ -20,14 +20,15 @@ class Vehicle(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     registration_number = Column(String, unique=True, index=True, nullable=False)
+    name_model = Column(String, nullable=False)
+    type = Column(String, nullable=False)
     max_load_capacity = Column(Float, default=0.0)
-    type_id = Column(Integer, ForeignKey("vehicle_types.id"), nullable=False)
     status = Column(SQLEnum(VehicleStatus, name="vehiclestatus"), default=VehicleStatus.available, nullable=False)
-    mileage = Column(Integer, default=0)
-    region_id = Column(Integer, ForeignKey("regions.id"), nullable=False)
+    odometer = Column(Float, default=0.0)
+    acquisition_cost = Column(Float, default=0.0)
+    region_id = Column(Integer, ForeignKey("regions.id"), nullable=True)
 
     # Relationships
-    type = relationship("VehicleType")
     region = relationship("Region")
     trips = relationship("Trip", back_populates="vehicle")
     maintenance_records = relationship("MaintenanceRecord", back_populates="vehicle")
@@ -41,12 +42,13 @@ class Driver(Base):
     last_name = Column(String, nullable=False)
     license_number = Column(String, unique=True, index=True, nullable=False)
     license_expiry_date = Column(Date)
-    license_category_id = Column(Integer, ForeignKey("license_categories.id"), nullable=False)
+    license_category = Column(String, nullable=False)
+    contact_number = Column(String, nullable=True)
+    safety_score = Column(Integer, default=100)
     status = Column(SQLEnum(DriverStatus, name="driverstatus"), default=DriverStatus.available, nullable=False)
-    region_id = Column(Integer, ForeignKey("regions.id"), nullable=False)
+    region_id = Column(Integer, ForeignKey("regions.id"), nullable=True)
 
     # Relationships
-    license_category = relationship("LicenseCategory")
     region = relationship("Region")
     trips = relationship("Trip", back_populates="driver")
 
@@ -57,6 +59,7 @@ class Trip(Base):
     vehicle_id = Column(Integer, ForeignKey("vehicles.id"), nullable=False)
     driver_id = Column(Integer, ForeignKey("drivers.id"), nullable=False)
     cargo_weight = Column(Float)
+    planned_distance = Column(Float, default=0.0)
     start_time = Column(DateTime)
     end_time = Column(DateTime)
     status = Column(SQLEnum(TripStatus, name="tripstatus"), default=TripStatus.draft, nullable=False)

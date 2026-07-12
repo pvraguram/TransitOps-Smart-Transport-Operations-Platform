@@ -19,3 +19,24 @@ def login(user_in: UserCreate, db: Session = Depends(get_db)):
     
     token = jwt.encode({"sub": user.email}, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
     return {"access_token": token, "token_type": "bearer"}
+
+@router.post("/register", response_model=Token, status_code=status.HTTP_201_CREATED)
+def register(user_in: UserCreate, db: Session = Depends(get_db)):
+    existing = db.query(User).filter(User.email == user_in.email).first()
+    if existing:
+        raise HTTPException(status_code=400, detail="Email already registered")
+    
+    hashed = pwd_context.hash(user_in.password)
+    new_user = User(
+        email=user_in.email,
+        hashed_password=hashed,
+        full_name=user_in.full_name,
+        role=user_in.role or "user",
+        is_active=True,
+    )
+    db.add(new_user)
+    db.commit()
+    db.refresh(new_user)
+    
+    token = jwt.encode({"sub": new_user.email}, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
+    return {"access_token": token, "token_type": "bearer"}

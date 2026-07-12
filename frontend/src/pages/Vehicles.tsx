@@ -2,7 +2,6 @@ import { useState, useEffect } from "react";
 import { Car, Plus, Search, X } from "lucide-react";
 import { vehicleApi } from "../services/api";
 
-type VehicleStatus = "available" | "on_trip" | "in_shop" | "retired";
 
 function StatusPill({ status }: { status: string }) {
   const styles: Record<string, string> = {
@@ -24,6 +23,8 @@ export default function Vehicles() {
   const [typeFilter, setTypeFilter] = useState("All");
   const [statusFilter, setStatusFilter] = useState("All");
   const [showAddVehicle, setShowAddVehicle] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
 
   const [newRegNo, setNewRegNo] = useState("");
   const [newNameModel, setNewNameModel] = useState("");
@@ -55,8 +56,12 @@ export default function Vehicles() {
 
   const handleAddVehicle = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newRegNo || !newNameModel) return;
-
+    const errors: Record<string, string> = {};
+    if (!newRegNo.trim()) errors.regNo = "Registration number is required.";
+    if (!newNameModel.trim()) errors.nameModel = "Model / Name is required.";
+    if (Object.keys(errors).length > 0) { setFormErrors(errors); return; }
+    setFormErrors({});
+    setSaving(true);
     try {
       await vehicleApi.create({
         registration_number: newRegNo,
@@ -74,6 +79,8 @@ export default function Vehicles() {
       setNewCost("");
     } catch (e) {
       console.error(e);
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -175,8 +182,11 @@ export default function Vehicles() {
 
       {/* Add Vehicle Modal */}
       {showAddVehicle && (
-        <div className="fixed inset-0 bg-[#1D1A39]/60 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl w-full max-w-md p-6">
+        <div
+          className="fixed inset-0 bg-[#1D1A39]/60 flex items-center justify-center z-50 p-4"
+          onClick={() => setShowAddVehicle(false)}
+        >
+          <div className="bg-white rounded-xl w-full max-w-md p-6" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
                 <div className="w-8 h-8 rounded-lg bg-[#F39F5A]/20 flex items-center justify-center">
@@ -199,10 +209,11 @@ export default function Vehicles() {
                 </label>
                 <input
                   value={newRegNo}
-                  onChange={(e) => setNewRegNo(e.target.value)}
+                  onChange={(e) => { setNewRegNo(e.target.value); setFormErrors(p => ({ ...p, regNo: "" })); }}
                   placeholder="e.g. MH-12-AB-1234"
-                  className="w-full px-3 py-2.5 text-sm border border-[#662549]/20 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#F39F5A]/40"
+                  className={`w-full px-3 py-2.5 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#F39F5A]/40 ${formErrors.regNo ? "border-red-400" : "border-[#662549]/20"}`}
                 />
+                {formErrors.regNo && <p className="text-xs text-red-500 mt-1">{formErrors.regNo}</p>}
               </div>
 
               <div>
@@ -211,10 +222,11 @@ export default function Vehicles() {
                 </label>
                 <input
                   value={newNameModel}
-                  onChange={(e) => setNewNameModel(e.target.value)}
-                  placeholder="e.g. VAN-06"
-                  className="w-full px-3 py-2.5 text-sm border border-[#662549]/20 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#F39F5A]/40"
+                  onChange={(e) => { setNewNameModel(e.target.value); setFormErrors(p => ({ ...p, nameModel: "" })); }}
+                  placeholder="e.g. Tata Ace Gold"
+                  className={`w-full px-3 py-2.5 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#F39F5A]/40 ${formErrors.nameModel ? "border-red-400" : "border-[#662549]/20"}`}
                 />
+                {formErrors.nameModel && <p className="text-xs text-red-500 mt-1">{formErrors.nameModel}</p>}
               </div>
 
               <div>
@@ -268,9 +280,10 @@ export default function Vehicles() {
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 py-2.5 text-sm font-semibold rounded-lg bg-[#F39F5A] text-[#1D1A39] hover:brightness-95"
+                  disabled={saving}
+                  className="flex-1 py-2.5 text-sm font-semibold rounded-lg bg-[#F39F5A] text-[#1D1A39] hover:brightness-95 disabled:opacity-60"
                 >
-                  Add Vehicle
+                  {saving ? "Adding..." : "Add Vehicle"}
                 </button>
               </div>
             </form>

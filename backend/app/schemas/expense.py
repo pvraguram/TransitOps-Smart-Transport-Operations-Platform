@@ -22,7 +22,7 @@ class ExpenseResponse(ExpenseBase):
 class FuelLogBase(BaseModel):
     vehicle_id: int
     date: date
-    liters: float
+    gallons: float
     cost: float
     odometer_reading: Optional[int] = None
 

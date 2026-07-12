@@ -1,4 +1,4 @@
-import { Search, Bell } from "lucide-react";
+import { Search } from "lucide-react";
 import { useAuth } from "../hooks/useAuth";
 
 interface HeaderProps {

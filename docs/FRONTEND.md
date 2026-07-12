@@ -325,19 +325,23 @@ vehicleService = {
 
 ```typescript
 // Every page follows this identical pattern:
-const [items, setItems] = useState<Vehicle[]>(mockVehicles) // ← mock now
-const [loading, setLoading] = useState(false)
-const [error, setError] = useState<string | null>(null)
+const [items, setItems] = useState<any[]>([])
+
+const loadItems = async () => {
+  try {
+    const res = await vehicleApi.getAll()
+    setItems(res.data)
+  } catch (e) {
+    console.error(e)
+  }
+}
 
 useEffect(() => {
-  // TODO: Replace with real API call:
-  // setLoading(true)
-  // vehicleService.getAll()
-  //   .then(res => setItems(res.data))
-  //   .catch(() => setError('Failed to load'))
-  //   .finally(() => setLoading(false))
+  loadItems()
 }, [])
 ```
+
+This is wired up for real in every page (`Vehicles.tsx`, `Drivers.tsx`, `Trips.tsx`, `Maintenance.tsx`, `Expenses.tsx`, `Dashboard.tsx`) — there is no mock-data fallback left in the app; `src/data/mockData.ts` is unused legacy scaffolding.
 
 ---
 

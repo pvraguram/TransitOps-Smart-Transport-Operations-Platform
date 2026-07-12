@@ -27,13 +27,23 @@
 
 ## 1. Overview
 
-The TransitOps database stores all operational fleet data across **12 tables**: 5 lookup/reference tables, 4 PostgreSQL ENUM types, and 7 core entity tables. The schema is designed to **Third Normal Form (3NF)** with full referential integrity enforced at the database level.
+The TransitOps database stores all operational fleet data across **10 tables**: 3 lookup/reference tables, 6 PostgreSQL ENUM types, and 7 core entity tables. `maintenance_types` and `expense_categories` are **not** DB tables — they're fixed Python enums (`MaintenanceType`, `ExpenseType` in `app/models/enums.py`) surfaced read-only via `GET /api/lookup/maintenance-types` and `/expense-types`.
 
 | Category | Tables |
 |---|---|
-| **Lookup tables** | `vehicle_types`, `regions`, `license_categories`, `maintenance_types`, `expense_categories` |
+| **Lookup tables** | `vehicle_types`, `regions`, `license_categories` |
 | **Core tables** | `users`, `vehicles`, `drivers`, `trips`, `maintenance_records`, `fuel_logs`, `expenses` |
-| **ENUM types** | `vehicle_status`, `driver_status`, `trip_status`, `maintenance_status` |
+| **ENUM types** | `vehiclestatus`, `driverstatus`, `tripstatus`, `maintenancestatus`, `maintenancetype`, `expensetype` |
+
+> **Sync note (§4–9 below):** the normalization walkthrough that follows describes a fully-normalized design where
+> `vehicles.vehicle_type_id` and `drivers.license_category_id` are foreign keys into `vehicle_types` /
+> `license_categories`. The actual schema stores `vehicles.type` and `drivers.license_category` as plain strings
+> instead — the lookup tables exist and are seeded, but nothing currently joins to them. This was a deliberate
+> simplification to match what the Add-Vehicle/Add-Driver forms actually collect (a free-text/hardcoded-dropdown
+> type, not a lookup ID). `vehicles.region_id` / `drivers.region_id` are nullable FKs into `regions` that are
+> populated at seed time but not currently collected by either create form. Treat the FK-based examples below as
+> the *rationale* for why lookup tables exist, not as the literal current schema — see `app/models/core.py` and
+> `app/models/lookups.py` for ground truth.
 
 ---
 

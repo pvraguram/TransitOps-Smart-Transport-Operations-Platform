@@ -2,8 +2,6 @@ import { useState, useEffect } from "react";
 import { Fuel, Plus, Receipt, TrendingUp } from "lucide-react";
 import { expenseApi, vehicleApi, tripApi } from "../services/api";
 
-type Status = "Available" | "Completed" | "Pending";
-
 function StatusPill({ status }: { status: string }) {
   const styles: Record<string, string> = {
     Available: "bg-[#F39F5A]/20 text-[#F39F5A] border border-[#F39F5A]/40",
@@ -12,7 +10,7 @@ function StatusPill({ status }: { status: string }) {
   };
   return (
     <span className={`px-2.5 py-1 rounded-full text-xs font-semibold capitalize ${styles[status] || ""}`}>
-      {status.replace("_", " ")}
+      {status?.replace("_", " ")}
     </span>
   );
 }
@@ -25,14 +23,19 @@ export default function Expenses() {
 
   const [showLogFuel, setShowLogFuel] = useState(false);
   const [showAddExpense, setShowAddExpense] = useState(false);
+  const [savingFuel, setSavingFuel] = useState(false);
+  const [savingExpense, setSavingExpense] = useState(false);
+  const [fuelErrors, setFuelErrors] = useState<Record<string, string>>({});
+  const [expenseErrors, setExpenseErrors] = useState<Record<string, string>>({});
 
-  // Form states
+  // Fuel form
   const [fuelVehicleId, setFuelVehicleId] = useState("");
   const [fuelLitres, setFuelLitres] = useState("");
   const [fuelCost, setFuelCost] = useState("");
 
+  // Expense form
   const [expenseTripId, setExpenseTripId] = useState("");
-  const [expenseCategory, setExpenseCategory] = useState("Toll");
+  const [expenseType, setExpenseType] = useState("toll");
   const [expenseAmount, setExpenseAmount] = useState("");
   const [expenseDescription, setExpenseDescription] = useState("");
 
@@ -58,13 +61,20 @@ export default function Expenses() {
   }, []);
 
   const handleSaveFuel = async () => {
-    if (!fuelVehicleId || !fuelLitres || !fuelCost) return;
+    const errors: Record<string, string> = {};
+    if (!fuelVehicleId) errors.vehicle = "Please select a vehicle.";
+    if (!fuelLitres) errors.litres = "Litres is required.";
+    if (!fuelCost) errors.cost = "Cost is required.";
+    if (Object.keys(errors).length > 0) { setFuelErrors(errors); return; }
+    setFuelErrors({});
+    setSavingFuel(true);
     try {
+      // Backend expects: vehicle_id, date, gallons (not litres), cost, odometer_reading
       await expenseApi.logFuel({
         vehicle_id: Number(fuelVehicleId),
-        litres: Number(fuelLitres),
+        gallons: Number(fuelLitres),   // field name the backend schema uses
         cost: Number(fuelCost),
-        date: new Date().toISOString()
+        date: new Date().toISOString().split("T")[0],
       });
       setShowLogFuel(false);
       setFuelVehicleId("");
@@ -73,18 +83,26 @@ export default function Expenses() {
       loadData();
     } catch (e) {
       console.error(e);
+    } finally {
+      setSavingFuel(false);
     }
   };
 
   const handleSaveExpense = async () => {
-    if (!expenseTripId || !expenseAmount) return;
+    const errors: Record<string, string> = {};
+    if (!expenseTripId) errors.trip = "Please select a trip.";
+    if (!expenseAmount) errors.amount = "Amount is required.";
+    if (Object.keys(errors).length > 0) { setExpenseErrors(errors); return; }
+    setExpenseErrors({});
+    setSavingExpense(true);
     try {
+      // Backend expects: trip_id, type (enum: toll|parking|fine|other), amount, description, date
       await expenseApi.addExpense({
         trip_id: Number(expenseTripId),
+        type: expenseType,             // backend enum key, not "category"
         amount: Number(expenseAmount),
-        category: expenseCategory,
         description: expenseDescription || null,
-        date: new Date().toISOString()
+        date: new Date().toISOString().split("T")[0],
       });
       setShowAddExpense(false);
       setExpenseTripId("");
@@ -93,11 +111,13 @@ export default function Expenses() {
       loadData();
     } catch (e) {
       console.error(e);
+    } finally {
+      setSavingExpense(false);
     }
   };
 
-  const totalFuelCost = fuelLogs.reduce((sum, f) => sum + f.cost, 0);
-  const totalOtherCost = otherExpenses.reduce((sum, e) => sum + e.amount, 0);
+  const totalFuelCost = fuelLogs.reduce((sum, f) => sum + (f.cost || 0), 0);
+  const totalOtherCost = otherExpenses.reduce((sum, e) => sum + (e.amount || 0), 0);
   const totalOperationalCost = totalFuelCost + totalOtherCost;
 
   return (
@@ -134,19 +154,19 @@ export default function Expenses() {
           <div className="flex items-center gap-2 text-[#662549]/70 text-xs font-semibold uppercase">
             <Fuel className="w-4 h-4" /> Total Fuel Cost
           </div>
-          <p className="text-2xl font-bold text-[#1D1A39] mt-2">₹{totalFuelCost.toLocaleString()}</p>
+          <p className="text-2xl font-bold text-[#1D1A39] mt-2">₹{totalFuelCost.toLocaleString("en-IN")}</p>
         </div>
         <div className="bg-white rounded-xl border border-[#662549]/15 p-4 shadow-sm">
           <div className="flex items-center gap-2 text-[#662549]/70 text-xs font-semibold uppercase">
             <Receipt className="w-4 h-4" /> Other Expenses
           </div>
-          <p className="text-2xl font-bold text-[#1D1A39] mt-2">₹{totalOtherCost.toLocaleString()}</p>
+          <p className="text-2xl font-bold text-[#1D1A39] mt-2">₹{totalOtherCost.toLocaleString("en-IN")}</p>
         </div>
         <div className="bg-[#1D1A39] rounded-xl p-4 shadow-sm">
           <div className="flex items-center gap-2 text-[#F39F5A] text-xs font-semibold uppercase">
             <TrendingUp className="w-4 h-4" /> Total Operational Cost
           </div>
-          <p className="text-2xl font-bold text-white mt-2">₹{totalOperationalCost.toLocaleString()}</p>
+          <p className="text-2xl font-bold text-white mt-2">₹{totalOperationalCost.toLocaleString("en-IN")}</p>
         </div>
       </div>
 
@@ -160,7 +180,7 @@ export default function Expenses() {
             <tr className="bg-[#E8BCB9]/20 text-left text-[#662549] text-xs font-semibold uppercase">
               <th className="px-5 py-3">Vehicle ID</th>
               <th className="px-5 py-3">Date</th>
-              <th className="px-5 py-3">Litres</th>
+              <th className="px-5 py-3">Litres / Gallons</th>
               <th className="px-5 py-3">Cost (₹)</th>
             </tr>
           </thead>
@@ -168,9 +188,9 @@ export default function Expenses() {
             {fuelLogs.map((log) => (
               <tr key={log.id} className="border-t border-[#662549]/10 hover:bg-[#E8BCB9]/10">
                 <td className="px-5 py-3 font-medium text-[#1D1A39]">{log.vehicle_id}</td>
-                <td className="px-5 py-3 text-[#451952]/80">{new Date(log.date).toLocaleDateString()}</td>
-                <td className="px-5 py-3 text-[#451952]/80">{log.litres} L</td>
-                <td className="px-5 py-3 font-semibold text-[#1D1A39]">₹{log.cost.toLocaleString()}</td>
+                <td className="px-5 py-3 text-[#451952]/80">{log.date ? new Date(log.date).toLocaleDateString("en-IN") : "-"}</td>
+                <td className="px-5 py-3 text-[#451952]/80">{log.gallons ?? log.liters ?? "-"}</td>
+                <td className="px-5 py-3 font-semibold text-[#1D1A39]">₹{log.cost?.toLocaleString("en-IN")}</td>
               </tr>
             ))}
             {fuelLogs.length === 0 && (
@@ -191,7 +211,7 @@ export default function Expenses() {
           <thead>
             <tr className="bg-[#E8BCB9]/20 text-left text-[#662549] text-xs font-semibold uppercase">
               <th className="px-5 py-3">Trip ID</th>
-              <th className="px-5 py-3">Category</th>
+              <th className="px-5 py-3">Type</th>
               <th className="px-5 py-3">Description</th>
               <th className="px-5 py-3">Amount (₹)</th>
               <th className="px-5 py-3">Status</th>
@@ -201,11 +221,11 @@ export default function Expenses() {
             {otherExpenses.map((exp) => (
               <tr key={exp.id} className="border-t border-[#662549]/10 hover:bg-[#E8BCB9]/10">
                 <td className="px-5 py-3 font-medium text-[#1D1A39]">TR-{exp.trip_id}</td>
-                <td className="px-5 py-3 text-[#451952]/80">{exp.category}</td>
+                <td className="px-5 py-3 text-[#451952]/80 capitalize">{exp.type}</td>
                 <td className="px-5 py-3 text-[#451952]/80">{exp.description || "-"}</td>
-                <td className="px-5 py-3 font-semibold text-[#1D1A39]">₹{exp.amount.toLocaleString()}</td>
+                <td className="px-5 py-3 font-semibold text-[#1D1A39]">₹{exp.amount?.toLocaleString("en-IN")}</td>
                 <td className="px-5 py-3">
-                  <StatusPill status={exp.status} />
+                  <StatusPill status={exp.status ?? "Pending"} />
                 </td>
               </tr>
             ))}
@@ -220,34 +240,46 @@ export default function Expenses() {
 
       {/* Log Fuel Modal */}
       {showLogFuel && (
-        <div className="fixed inset-0 bg-[#1D1A39]/60 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl w-full max-w-md p-6">
+        <div
+          className="fixed inset-0 bg-[#1D1A39]/60 flex items-center justify-center z-50 p-4"
+          onClick={() => setShowLogFuel(false)}
+        >
+          <div className="bg-white rounded-xl w-full max-w-md p-6" onClick={(e) => e.stopPropagation()}>
             <h3 className="font-bold text-lg text-[#1D1A39] mb-4">Log Fuel</h3>
             <div className="space-y-3">
-              <select
-                value={fuelVehicleId}
-                onChange={(e) => setFuelVehicleId(e.target.value)}
-                className="w-full px-3 py-2.5 text-sm border border-[#662549]/20 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#F39F5A]/40 bg-white"
-              >
-                <option value="">Select vehicle</option>
-                {vehicles.map((v) => (
-                  <option key={v.id} value={v.id}>{v.registration_number}</option>
-                ))}
-              </select>
-              <input
-                placeholder="Litres"
-                type="number"
-                value={fuelLitres}
-                onChange={(e) => setFuelLitres(e.target.value)}
-                className="w-full px-3 py-2.5 text-sm border border-[#662549]/20 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#F39F5A]/40"
-              />
-              <input
-                placeholder="Cost (₹)"
-                type="number"
-                value={fuelCost}
-                onChange={(e) => setFuelCost(e.target.value)}
-                className="w-full px-3 py-2.5 text-sm border border-[#662549]/20 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#F39F5A]/40"
-              />
+              <div>
+                <select
+                  value={fuelVehicleId}
+                  onChange={(e) => { setFuelVehicleId(e.target.value); setFuelErrors(p => ({ ...p, vehicle: "" })); }}
+                  className={`w-full px-3 py-2.5 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#F39F5A]/40 bg-white ${fuelErrors.vehicle ? "border-red-400" : "border-[#662549]/20"}`}
+                >
+                  <option value="">Select vehicle</option>
+                  {vehicles.map((v) => (
+                    <option key={v.id} value={v.id}>{v.registration_number}</option>
+                  ))}
+                </select>
+                {fuelErrors.vehicle && <p className="text-xs text-red-500 mt-1">{fuelErrors.vehicle}</p>}
+              </div>
+              <div>
+                <input
+                  placeholder="Litres"
+                  type="number"
+                  value={fuelLitres}
+                  onChange={(e) => { setFuelLitres(e.target.value); setFuelErrors(p => ({ ...p, litres: "" })); }}
+                  className={`w-full px-3 py-2.5 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#F39F5A]/40 ${fuelErrors.litres ? "border-red-400" : "border-[#662549]/20"}`}
+                />
+                {fuelErrors.litres && <p className="text-xs text-red-500 mt-1">{fuelErrors.litres}</p>}
+              </div>
+              <div>
+                <input
+                  placeholder="Cost (₹)"
+                  type="number"
+                  value={fuelCost}
+                  onChange={(e) => { setFuelCost(e.target.value); setFuelErrors(p => ({ ...p, cost: "" })); }}
+                  className={`w-full px-3 py-2.5 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#F39F5A]/40 ${fuelErrors.cost ? "border-red-400" : "border-[#662549]/20"}`}
+                />
+                {fuelErrors.cost && <p className="text-xs text-red-500 mt-1">{fuelErrors.cost}</p>}
+              </div>
             </div>
             <div className="flex gap-3 mt-6">
               <button
@@ -258,9 +290,10 @@ export default function Expenses() {
               </button>
               <button
                 onClick={handleSaveFuel}
-                className="flex-1 py-2.5 text-sm font-semibold rounded-lg bg-[#F39F5A] text-[#1D1A39] hover:brightness-95"
+                disabled={savingFuel}
+                className="flex-1 py-2.5 text-sm font-semibold rounded-lg bg-[#F39F5A] text-[#1D1A39] hover:brightness-95 disabled:opacity-60"
               >
-                Save
+                {savingFuel ? "Saving..." : "Save"}
               </button>
             </div>
           </div>
@@ -269,38 +302,48 @@ export default function Expenses() {
 
       {/* Add Expense Modal */}
       {showAddExpense && (
-        <div className="fixed inset-0 bg-[#1D1A39]/60 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl w-full max-w-md p-6">
+        <div
+          className="fixed inset-0 bg-[#1D1A39]/60 flex items-center justify-center z-50 p-4"
+          onClick={() => setShowAddExpense(false)}
+        >
+          <div className="bg-white rounded-xl w-full max-w-md p-6" onClick={(e) => e.stopPropagation()}>
             <h3 className="font-bold text-lg text-[#1D1A39] mb-4">Add Expense</h3>
             <div className="space-y-3">
+              <div>
+                <select
+                  value={expenseTripId}
+                  onChange={(e) => { setExpenseTripId(e.target.value); setExpenseErrors(p => ({ ...p, trip: "" })); }}
+                  className={`w-full px-3 py-2.5 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#F39F5A]/40 bg-white ${expenseErrors.trip ? "border-red-400" : "border-[#662549]/20"}`}
+                >
+                  <option value="">Select Trip</option>
+                  {trips.map((t) => (
+                    <option key={t.id} value={t.id}>TR-{t.id}: {t.origin} → {t.destination}</option>
+                  ))}
+                </select>
+                {expenseErrors.trip && <p className="text-xs text-red-500 mt-1">{expenseErrors.trip}</p>}
+              </div>
               <select
-                value={expenseTripId}
-                onChange={(e) => setExpenseTripId(e.target.value)}
+                value={expenseType}
+                onChange={(e) => setExpenseType(e.target.value)}
                 className="w-full px-3 py-2.5 text-sm border border-[#662549]/20 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#F39F5A]/40 bg-white"
               >
-                <option value="">Select Trip</option>
-                {trips.map((t) => (
-                  <option key={t.id} value={t.id}>TR-{t.id}: {t.origin} → {t.destination}</option>
-                ))}
+                <option value="toll">Toll</option>
+                <option value="parking">Parking</option>
+                <option value="fine">Fine</option>
+                <option value="other">Other</option>
               </select>
-              <select
-                value={expenseCategory}
-                onChange={(e) => setExpenseCategory(e.target.value)}
-                className="w-full px-3 py-2.5 text-sm border border-[#662549]/20 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#F39F5A]/40 bg-white"
-              >
-                <option value="Toll">Toll</option>
-                <option value="Food">Food</option>
-                <option value="Misc">Misc</option>
-              </select>
+              <div>
+                <input
+                  placeholder="Amount (₹)"
+                  type="number"
+                  value={expenseAmount}
+                  onChange={(e) => { setExpenseAmount(e.target.value); setExpenseErrors(p => ({ ...p, amount: "" })); }}
+                  className={`w-full px-3 py-2.5 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#F39F5A]/40 ${expenseErrors.amount ? "border-red-400" : "border-[#662549]/20"}`}
+                />
+                {expenseErrors.amount && <p className="text-xs text-red-500 mt-1">{expenseErrors.amount}</p>}
+              </div>
               <input
-                placeholder="Amount (₹)"
-                type="number"
-                value={expenseAmount}
-                onChange={(e) => setExpenseAmount(e.target.value)}
-                className="w-full px-3 py-2.5 text-sm border border-[#662549]/20 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#F39F5A]/40"
-              />
-              <input
-                placeholder="Description"
+                placeholder="Description (optional)"
                 value={expenseDescription}
                 onChange={(e) => setExpenseDescription(e.target.value)}
                 className="w-full px-3 py-2.5 text-sm border border-[#662549]/20 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#F39F5A]/40"
@@ -315,9 +358,10 @@ export default function Expenses() {
               </button>
               <button
                 onClick={handleSaveExpense}
-                className="flex-1 py-2.5 text-sm font-semibold rounded-lg bg-[#451952] text-white hover:bg-[#662549]"
+                disabled={savingExpense}
+                className="flex-1 py-2.5 text-sm font-semibold rounded-lg bg-[#451952] text-white hover:bg-[#662549] disabled:opacity-60"
               >
-                Submit
+                {savingExpense ? "Submitting..." : "Submit"}
               </button>
             </div>
           </div>

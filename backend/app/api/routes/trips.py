@@ -45,6 +45,7 @@ def dispatch_trip(trip_in: TripDispatch, db: Session = Depends(get_db)):
         vehicle_id=trip_in.vehicle_id,
         driver_id=trip_in.driver_id,
         cargo_weight=trip_in.cargo_weight,
+        planned_distance=trip_in.planned_distance,
         origin=trip_in.origin,
         destination=trip_in.destination,
         status=TripStatus.dispatched,

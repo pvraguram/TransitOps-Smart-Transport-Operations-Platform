@@ -8,7 +8,7 @@ class DriverBase(BaseModel):
     last_name: str
     license_number: str
     license_category: str
-    license_expiry_date: date
+    license_expiry_date: Optional[date] = None
     contact_number: str
     safety_score: Optional[int] = 100
     status: Optional[DriverStatus] = DriverStatus.available

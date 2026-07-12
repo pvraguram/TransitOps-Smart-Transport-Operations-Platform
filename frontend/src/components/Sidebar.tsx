@@ -6,7 +6,6 @@ import {
   Route,
   Wrench,
   Fuel,
-  BarChart3,
   Settings,
   LogOut,
 } from "lucide-react";

@@ -8,7 +8,7 @@ class VehicleBase(BaseModel):
     type: str
     max_load_capacity: float
     status: Optional[VehicleStatus] = VehicleStatus.available
-    odometer: Optional[int] = 0
+    odometer: Optional[float] = 0
     acquisition_cost: Optional[float] = 0.0
     region_id: Optional[int] = None
 

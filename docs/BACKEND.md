@@ -1,8 +1,14 @@
 # TransitOps — Backend Architecture
 
-**Version:** 1.0.0
+**Version:** 1.0.1
 **Date:** 2026-07-12
 **Stack:** FastAPI · Python 3.11+ · SQLAlchemy 2 · Pydantic v2 · PostgreSQL 18 · python-jose JWT · passlib bcrypt · Uvicorn
+
+> **Sync note:** the module structure in §2 below reflects the original design. The actual code consolidates all
+> ORM models into `app/models/core.py` (+ `app/models/lookups.py` for `Region`/`VehicleType`/`LicenseCategory`) and
+> all Pydantic schemas already exist as one file per domain under `app/schemas/`, matching §2 there. `Vehicle.type`
+> and `Driver.license_category` are plain strings, not foreign keys — see the sync note in `DATABASE.md` §7. See
+> `API.md` for the authoritative, verified endpoint list.
 
 ---
 

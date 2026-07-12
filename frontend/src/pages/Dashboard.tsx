@@ -4,7 +4,6 @@ import KpiCard from "../components/KpiCard";
 import DataTable from "../components/DataTable";
 import StatusBadge from "../components/StatusBadge";
 import { analyticsApi, tripApi, vehicleApi } from "../services/api";
-import type { RecentTrip } from "../types";
 
 function FilterSelect({ label }: { label: string }) {
   return (
@@ -42,9 +41,9 @@ export default function Dashboard() {
     if (!stats) return [];
     return [
       { label: "Active Vehicles", value: stats.active_vehicles },
-      { label: "Vehicles in Maintenance", value: stats.vehicles_in_maintenance, accent: "rose" },
+      { label: "Vehicles in Maintenance", value: stats.vehicles_in_maintenance, accent: "rose" as const },
       { label: "Active Trips", value: stats.active_trips },
-      { label: "Pending Trips", value: stats.pending_trips, accent: "orange" },
+      { label: "Pending Trips", value: stats.pending_trips, accent: "orange" as const },
       { label: "Drivers on Duty", value: stats.drivers_on_duty },
     ];
   }, [stats]);
