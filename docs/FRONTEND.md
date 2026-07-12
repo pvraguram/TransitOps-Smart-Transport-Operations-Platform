@@ -18,6 +18,7 @@
 8. [Design System](#design-system)
 9. [Data Flow Diagrams](#data-flow-diagrams)
 10. [Mock → Real API Migration](#mock--real-api-migration)
+11. [Settings Page (UI-only)](#11-settings-page-ui-only)
 
 ---
 
@@ -25,7 +26,7 @@
 
 The TransitOps frontend is a **Single Page Application (SPA)** built with React and TypeScript. It communicates exclusively with the FastAPI backend via Axios HTTP calls using JWT Bearer tokens for authentication.
 
-The UI is organized around a **fixed sidebar navigation** and a **scrollable main content area**, giving users access to 6 operational modules: Dashboard, Vehicles, Drivers, Trips, Maintenance, and Expenses.
+The UI is organized around a **fixed sidebar navigation** and a **scrollable main content area**, giving users access to 7 pages: Dashboard, Vehicles, Drivers, Trips, Maintenance, Expenses, and Settings (Settings is UI-only — see §11).
 
 ---
 
@@ -64,7 +65,8 @@ frontend/src/
 │   ├── Drivers.tsx      # Driver CRUD with search/filter
 │   ├── Trips.tsx        # Trip management with status actions
 │   ├── Maintenance.tsx  # Maintenance record management
-│   └── Expenses.tsx     # Fuel logs + other expenses (tabbed)
+│   ├── Expenses.tsx     # Fuel logs + other expenses
+│   └── Settings.tsx     # Profile/Security forms — UI only, not wired to the backend (see §11)
 │
 ├── services/            # API communication layer
 │   └── api.ts           # Axios instance + all service functions
@@ -114,6 +116,7 @@ graph TD
     Outlet --> Trips
     Outlet --> Maintenance
     Outlet --> Expenses
+    Outlet --> Settings
 
     Dashboard --> KpiCard
     Dashboard --> RechartsDonut["Recharts PieChart\n(fleet status)"]
@@ -165,35 +168,43 @@ flowchart TD
     CheckAuth -->|"Yes + path == /login"| RedirectHome["/ Dashboard"]
     CheckAuth -->|"Yes + protected path"| AppLayout
 
-    AppLayout --> R1["/ → Dashboard"]
+    AppLayout --> R1["/dashboard → Dashboard"]
     AppLayout --> R2["/vehicles → Vehicles"]
     AppLayout --> R3["/drivers → Drivers"]
     AppLayout --> R4["/trips → Trips"]
     AppLayout --> R5["/maintenance → Maintenance"]
     AppLayout --> R6["/expenses → Expenses"]
-    AppLayout --> R7["* → redirect /"]
+    AppLayout --> R7b["/settings → Settings"]
+    AppLayout --> R7["* → redirect /dashboard"]
 
     style RedirectLogin fill:#DC2626,color:#fff
     style RedirectHome fill:#2563EB,color:#fff
     style AppLayout fill:#1E293B,color:#fff
 ```
 
-### Route Configuration (App.tsx)
+### Route Configuration (actual, `App.tsx`)
 
 ```
 Routes
-├── /login             → <Login />                  (public)
-└── <AppLayout />                                    (protected — checks isAuthenticated)
-    ├── /              → <Dashboard />
-    ├── /vehicles      → <Vehicles />
-    ├── /drivers       → <Drivers />
-    ├── /trips         → <Trips />
-    ├── /maintenance   → <Maintenance />
-    ├── /expenses      → <Expenses />
-    └── *              → <Navigate to="/" />
+├── /login             → <Login />                     (public — if already authenticated, redirects to /dashboard)
+└── <ProtectedRoute><AppLayout /></ProtectedRoute>      (redirects to /login if not authenticated)
+    ├── /dashboard      → <Dashboard />
+    ├── /vehicles       → <Vehicles />
+    ├── /drivers        → <Drivers />
+    ├── /trips          → <Trips />
+    ├── /maintenance    → <Maintenance />
+    ├── /expenses       → <Expenses />
+    ├── /settings       → <Settings />
+    └── *                → <Navigate to="/dashboard" />
 ```
 
-**Auth Guard:** `AppLayout` reads `isAuthenticated` from `useAuth()`. If false, it redirects to `/login` using React Router's `<Navigate>` component — no page reload required.
+There is no route for bare `/` — it falls through to the `*` catch-all and redirects to `/dashboard` (or to
+`/login` first, via `ProtectedRoute`, if not authenticated). `Settings.tsx` exists and is routed but is not
+mentioned elsewhere in this document — see §11 below.
+
+**Auth Guard:** a dedicated `ProtectedRoute` wrapper component (not `AppLayout` itself) reads
+`isAuthenticated` from `useAuth()` and redirects to `/login` via `<Navigate replace>` if false — no page
+reload required. `AppLayout` itself only renders the Sidebar/Header/Outlet shell.
 
 ---
 
@@ -264,20 +275,30 @@ sequenceDiagram
 
 ### Token Storage and Interceptor
 
+The actual storage key is `transitops_user`, holding a JSON blob (not just the raw token), and it's written
+to `localStorage` or `sessionStorage` depending on the "remember me" checkbox on the Login page:
+
 ```
-localStorage
-  └── 'token'  →  "eyJhbGciOiJIUzI1NiJ9..."
+localStorage / sessionStorage
+  └── 'transitops_user'  →  { "email": "...", "role": "...", "token": "eyJhbGci...", "provider": "local" }
 
 Axios Interceptor (api.ts)
-  ├── Reads token on every request
-  └── Injects: Authorization: Bearer <token>
+  ├── Reads 'transitops_user' from localStorage, falling back to sessionStorage, on every request
+  └── Injects: Authorization: Bearer <user.token>
 
-Logout
-  ├── localStorage.removeItem('token')
-  ├── setUser(null)
-  └── setIsAuthenticated(false)
-  → Navigate to /login
+Response Interceptor
+  └── On any 401 response: clears both storages and hard-redirects to /login
+
+Logout (AuthContext.logout())
+  ├── localStorage.removeItem('transitops_user')
+  ├── sessionStorage.removeItem('transitops_user')
+  └── setUser(null)
 ```
+
+There is also a **mock OAuth path** (`AuthContext.mockOAuthLogin`) used by the Login page's "Google" /
+"Microsoft" buttons: it bypasses the backend entirely and writes a hardcoded `token: "mock-oauth-token-..."`
+into `localStorage`. That token is not a valid JWT — it will fail if a route ever calls `get_current_user`
+(see `BACKEND.md` §15), but works today since no route currently checks it.
 
 ---
 
@@ -306,19 +327,19 @@ graph TD
     Service -->|"setVehicles(data)"| Page
 ```
 
-### Service Function Pattern
+### Service Function Pattern (actual, `src/services/api.ts`)
 
-Every entity follows the same pattern in `api.ts`:
+Coverage is intentionally uneven — each service object only exposes what its backend router supports (see
+`API.md` for the full endpoint list):
 
 ```
-vehicleService = {
-  getAll(params?)    → GET /vehicles?status=&search=
-  getById(id)        → GET /vehicles/{id}
-  create(data)       → POST /vehicles
-  update(id, data)   → PUT /vehicles/{id}
-  updateStatus(id)   → PATCH /vehicles/{id}/status
-  delete(id)         → DELETE /vehicles/{id}
-}
+vehicleApi     = { getAll, getById, create }                              // no update/delete
+driverApi      = { getAll, getById, create }                              // no update/delete
+tripApi        = { getAll, getById, create, dispatch }                    // dispatch → POST /trips/dispatch
+maintenanceApi = { getAll, getById, create, updateStatus }                // updateStatus → PUT /{id}/status
+expenseApi     = { getFuelLogs, logFuel, getExpenses, addExpense }        // no update/delete
+authApi        = { login, register, logout }                              // logout is unused (no /auth/logout route)
+analyticsApi   = { getDashboardStats, getReports }                        // getReports has no matching route
 ```
 
 ### Page Data Loading Pattern
@@ -347,7 +368,7 @@ This is wired up for real in every page (`Vehicles.tsx`, `Drivers.tsx`, `Trips.t
 
 ## 8. Design System
 
-### Color Tokens (tailwind.config.js)
+### Color Tokens (tailwind.config.js) — defined but unused
 
 | Token | Hex | Usage |
 |---|---|---|
@@ -358,9 +379,25 @@ This is wired up for real in every page (`Vehicles.tsx`, `Drivers.tsx`, `Trips.t
 | `primary-hover` | `#1D4ED8` | Button hover state |
 | `primary-light` | `#EFF6FF` | Highlighted backgrounds |
 | `surface` | `#F8FAFC` | Page background |
-| White | `#FFFFFF` | Cards |
-| `slate-200` | `#E2E8F0` | Borders |
-| `slate-500` | `#64748B` | Muted text |
+
+These custom tokens are declared in `tailwind.config.js` but **no component currently references them**
+(`grep -r "sidebar-\|primary-" src` returns nothing outside the config file itself). Every page instead uses
+Tailwind's arbitrary-value syntax with hardcoded hex colors — a warm rose/navy palette, not the blue one above.
+
+### Actual Color Palette (in use across pages)
+
+| Hex | Typical usage |
+|---|---|
+| `#1D1A39` | Primary dark text / headings, dark surfaces (e.g. left login panel) |
+| `#662549` | Muted body text, borders (usually at reduced opacity, e.g. `#662549]/20`) |
+| `#451952` | Secondary buttons/accents (e.g. "Add Expense"), secondary text |
+| `#F39F5A` | Primary accent — main CTA buttons, active states, highlights |
+| `#AE445A` | Destructive/warning text (validation errors, capacity-exceeded banners) |
+| `#E8BCB9` | Soft page-background tint (e.g. `bg-[#E8BCB9]/10`) |
+
+Status colors (`StatusBadge.tsx`, and each page's local `StatusPill`) are ad hoc per page rather than a
+single shared map — e.g. `available` is green (`emerald-500`) on Vehicles/Trips but the Login page's brand
+gradient uses a separate purple-to-orange scheme entirely unrelated to status colors.
 
 ### Typography
 
@@ -388,19 +425,21 @@ This is wired up for real in every page (`Vehicles.tsx`, `Drivers.tsx`, `Trips.t
 | Suspended | `bg-red-100` | `text-red-700` | Driver |
 | Cancelled | `bg-red-100` | `text-red-700` | Trip |
 
-### Reusable CSS Classes (index.css)
+### Reusable CSS Classes (actual, `src/index.css` `@layer components`)
 
 | Class | Purpose |
 |---|---|
-| `.btn-primary` | Blue filled action button |
-| `.btn-secondary` | White outlined secondary button |
-| `.btn-danger` | Red destructive action button |
-| `.form-input` | Styled text/select input |
-| `.form-label` | Input label above field |
-| `.card` | White rounded shadow container |
-| `.page-container` | Page padding and spacing |
-| `.page-header` | Row with title on left, button on right |
-| `.page-title` | 2xl semibold heading |
+| `.card` | White card, `#E8BCB9` border, rounded-xl |
+| `.badge` | Base pill shape for status badges (color applied separately per status) |
+| `.table-header` | Table header row styling (muted text, tinted background) |
+| `.input-base` | Styled text input with the `#F39F5A` focus ring |
+| `.btn-primary` | `#F39F5A`-filled primary action button |
+
+Most pages don't actually use these utility classes either — they mostly repeat the full Tailwind utility
+string inline per element rather than extracting shared classes (e.g. `Vehicles.tsx`'s inputs and
+`Maintenance.tsx`'s inputs both hand-write the same border/focus-ring classes rather than using
+`.input-base`). There is no `.btn-secondary`, `.btn-danger`, `.form-input`, `.form-label`,
+`.page-container`, `.page-header`, or `.page-title` class defined anywhere in the codebase.
 
 ---
 
@@ -432,91 +471,65 @@ sequenceDiagram
 
 ### Trip Status Transition Flow
 
+There is no `Draft` stage in the actual implementation — `Trips.tsx` creates a trip already dispatched via
+`POST /trips/dispatch` (vehicle + driver assignment happens in the same call as creation). From there:
+
 ```mermaid
 stateDiagram-v2
-    [*] --> Draft : Create Trip
-    Draft --> Dispatched : PATCH /dispatch\n(vehicle + driver → On Trip)
-    Draft --> Cancelled : PATCH /cancel
-    Dispatched --> Completed : PATCH /complete\n(vehicle + driver → Available)
-    Dispatched --> Cancelled : PATCH /cancel\n(vehicle + driver → Available)
+    [*] --> Dispatched : POST /trips/dispatch\n(vehicle + driver -> on_trip)
+    Dispatched --> Completed : PUT /trips/{id}/status?status=completed\n(vehicle + driver -> available)
+    Dispatched --> Cancelled : PUT /trips/{id}/status?status=cancelled\n(vehicle + driver -> available)
     Completed --> [*]
     Cancelled --> [*]
 ```
 
+`Trips.tsx` currently only wires the create/dispatch step — there is no UI button yet for marking a trip
+completed or cancelled, even though the backend route supports it.
+
 ---
 
-## 10. Mock → Real API Migration
+## 10. Mock → Real API Migration (completed)
 
-The frontend is designed so that replacing mock data with real API calls requires **minimal changes per page**. Here is the exact pattern:
+This section originally described the *planned* migration off `mockData.ts` — that migration is now done.
+Every page below reads from and writes to the real backend; nothing reads from `mockData.ts` anymore
+(confirmed: `grep -r mockData src` only matches the file itself). It's left in `src/data/` unused rather than
+deleted. `AuthContext.login`/`register` call the real `/auth/login` / `/auth/register` endpoints and persist
+the response under `transitops_user` (see §6) — there is no mock-login fallback except the explicit "Google" /
+"Microsoft" OAuth buttons on the Login page, which are still mocked by design (no real OAuth provider is
+wired up).
 
-### Step 1 — Replace useState initialization
+### Actual per-page API coverage
 
-```typescript
-// BEFORE (mock)
-import { mockVehicles } from '../data/mockData'
-const [vehicles, setVehicles] = useState<Vehicle[]>(mockVehicles)
-
-// AFTER (real API)
-const [vehicles, setVehicles] = useState<Vehicle[]>([])
-```
-
-### Step 2 — Uncomment the useEffect API call
-
-```typescript
-// AFTER (real API)
-useEffect(() => {
-  setLoading(true)
-  vehicleService.getAll()
-    .then(res => setVehicles(res.data))
-    .catch(() => setError('Failed to load vehicles'))
-    .finally(() => setLoading(false))
-}, [])
-```
-
-### Step 3 — Wire Create/Update/Delete buttons
-
-```typescript
-// BEFORE (mock — updates local state only)
-const handleAdd = (data: VehicleCreate) => {
-  setVehicles(prev => [...prev, { id: Date.now(), ...data }])
-}
-
-// AFTER (real API)
-const handleAdd = async (data: VehicleCreate) => {
-  const res = await vehicleService.create(data)
-  setVehicles(prev => [...prev, res.data])
-}
-```
-
-### Step 4 — Replace AuthContext mock login
-
-```typescript
-// BEFORE (mock login — accepts any non-empty credentials)
-const login = (email: string) => {
-  setUser({ email, full_name: 'Admin', id: 1, is_active: true })
-  setIsAuthenticated(true)
-}
-
-// AFTER (real API)
-const login = async (email: string, password: string) => {
-  const res = await api.post<LoginResponse>('/auth/login', { email, password })
-  localStorage.setItem('token', res.data.access_token)
-  setUser(res.data.user)
-  setIsAuthenticated(true)
-}
-```
-
-### Migration Checklist
-
-| Page | useState mock → API | Create | Update | Delete | Status Action |
+| Page | Loads via | Create | Update | Delete | Status Action |
 |---|---|---|---|---|---|
-| Login.tsx | AuthContext.login() | — | — | — | — |
-| Dashboard.tsx | dashboardService.getStats() | — | — | — | — |
-| Vehicles.tsx | vehicleService.getAll() | ✓ | ✓ | ✓ | ✓ |
-| Drivers.tsx | driverService.getAll() | ✓ | ✓ | ✓ | ✓ |
-| Trips.tsx | tripService.getAll() | ✓ | — | — | dispatch/complete/cancel |
-| Maintenance.tsx | maintenanceService.getAll() | ✓ | ✓ | ✓ | complete |
-| Expenses.tsx | expenseService.getFuelLogs() expenseService.getExpenses() | ✓ | — | ✓ | — |
+| Login.tsx | — | `AuthContext.login` / `.register` (real API) | — | — | — |
+| Dashboard.tsx | `analyticsApi.getDashboardStats`, `tripApi.getAll`, `vehicleApi.getAll` | — | — | — | — |
+| Vehicles.tsx | `vehicleApi.getAll` | ✓ `vehicleApi.create` | — | — | — |
+| Drivers.tsx | `driverApi.getAll` | ✓ `driverApi.create` | — | — | — |
+| Trips.tsx | `tripApi.getAll`, `vehicleApi.getAll`, `driverApi.getAll` | ✓ `tripApi.dispatch` | — | — | — (no complete/cancel UI yet) |
+| Maintenance.tsx | `maintenanceApi.getAll`, `vehicleApi.getAll` | ✓ `maintenanceApi.create` | — | — | ✓ `maintenanceApi.updateStatus` ("Mark Done") |
+| Expenses.tsx | `expenseApi.getFuelLogs`, `expenseApi.getExpenses`, `vehicleApi.getAll`, `tripApi.getAll` | ✓ `expenseApi.logFuel`, `expenseApi.addExpense` | — | — | — |
+
+No page has Update or Delete because the backend doesn't expose those routes for these resources yet
+(see `BACKEND.md` §15, `API.md`).
+
+---
+
+## 11. Settings Page (UI-only)
+
+`Settings.tsx` is routed at `/settings` and rendered inside `AppLayout` like every other page, but its
+"Save" handler on both the Profile and Security tabs does not call any API:
+
+```typescript
+const handleSave = (e: React.FormEvent) => {
+  e.preventDefault();
+  alert("Settings saved successfully!");
+};
+```
+
+There is no `userApi`/`settingsApi` in `services/api.ts` and no `GET/PUT /api/auth/me` route on the backend
+to back it. Anything typed into these forms is discarded on refresh or logout. Treat this page as a visual
+placeholder, not a working feature, until a profile-update endpoint is added.
 
 ---
 

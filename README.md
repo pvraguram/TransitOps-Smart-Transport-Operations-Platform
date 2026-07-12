@@ -21,8 +21,20 @@ A full-stack fleet management system.
 TransitOps/
 ├── frontend/   # React + Vite SPA
 ├── backend/    # FastAPI REST API
+├── docs/       # Engineering documentation — start with docs/WORKFLOW.md
 └── README.md
 ```
+
+## Documentation
+
+| Document | What it covers |
+|---|---|
+| [`docs/WORKFLOW.md`](docs/WORKFLOW.md) | Start here — how the app actually behaves end to end, page by page |
+| [`docs/API.md`](docs/API.md) | Verified endpoint reference |
+| [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | System design, tech stack rationale |
+| [`docs/BACKEND.md`](docs/BACKEND.md) | Backend module structure and layers |
+| [`docs/FRONTEND.md`](docs/FRONTEND.md) | Frontend component/routing structure |
+| [`docs/DATABASE.md`](docs/DATABASE.md) | Schema, ERD, normalization notes |
 
 ---
 
@@ -30,8 +42,9 @@ TransitOps/
 
 ### 1. Database Setup
 ```bash
-# Create the PostgreSQL database
-psql -U postgres -c "CREATE DATABASE transitops;"
+cd backend
+copy .env.example .env       # Edit with your PostgreSQL credentials first
+python create_db.py          # Creates the database from DATABASE_URL in .env
 ```
 
 ### 2. Backend
@@ -77,7 +90,10 @@ npm run dev
 | Drivers | `/api/drivers` |
 | Trips | `/api/trips` |
 | Maintenance | `/api/maintenance` |
-| Fuel Logs | `/api/fuel-logs` |
+| Fuel Logs | `/api/expenses/fuel` |
 | Expenses | `/api/expenses` |
-| Dashboard | `/api/dashboard` |
+| Dashboard | `/api/analytics/dashboard` |
 | Lookup Data | `/api/lookup` |
+
+See [`docs/API.md`](docs/API.md) for full request/response shapes, and
+[`docs/WORKFLOW.md`](docs/WORKFLOW.md) for how each page uses these endpoints in practice.

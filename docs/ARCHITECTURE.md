@@ -1,9 +1,15 @@
 # TransitOps — System Architecture
 
-**Version:** 1.0.0
+**Version:** 1.0.1
 **Date:** 2026-07-12
 **Authors:** TransitOps Hackathon Team
 **Stack:** React 18 · FastAPI · PostgreSQL 18 · SQLAlchemy 2 · JWT
+
+> **Sync note:** §5.1 (CORS), §6 (request lifecycle), §7 (auth), and §9 (monorepo tree) below describe the
+> originally-planned design. See `BACKEND.md` §13/§15 and `FRONTEND.md` §6 for what's actually implemented —
+> in short: CORS allows all origins with credentials disabled (not a specific origin with credentials
+> enabled), no route currently enforces the JWT, and tokens carry no `exp` claim. The rest of this document
+> (tier layout, tech stack rationale, scalability notes) is still accurate.
 
 ---
 
@@ -169,13 +175,14 @@ graph LR
 
 All client–server communication follows REST conventions:
 
-| HTTP Method | Semantic | Example |
+| HTTP Method | Semantic | Example (as actually implemented — see `API.md`) |
 |---|---|---|
 | `GET` | Retrieve resources | `GET /api/vehicles` |
-| `POST` | Create a resource | `POST /api/vehicles` |
-| `PUT` | Full update of a resource | `PUT /api/vehicles/1` |
-| `PATCH` | Partial update / status action | `PATCH /api/trips/1/dispatch` |
-| `DELETE` | Remove a resource | `DELETE /api/vehicles/1` |
+| `POST` | Create a resource, or a status-changing action | `POST /api/vehicles`, `POST /api/trips/dispatch` |
+| `PUT` | Status update via query param | `PUT /api/trips/1/status?status=completed` |
+
+`PATCH` and `DELETE` are not currently used by any route, and there is no per-ID `GET`/`PUT` for Vehicles or
+Drivers — only list (`GET`) and create (`POST`).
 
 ### 5.2 Request / Response Format
 
@@ -344,9 +351,10 @@ TransitOps/                          ← Git repository root
 ├── docs/                            ← Engineering documentation (this folder)
 │   ├── ARCHITECTURE.md              ← System architecture (this document)
 │   ├── DATABASE.md                  ← Database schema and ERD
-│   ├── API.md                       ← Complete API reference
+│   ├── API.md                       ← Complete API reference (verified against running code)
 │   ├── FRONTEND.md                  ← Frontend component and routing architecture
-│   └── BACKEND.md                   ← Backend module and layer architecture
+│   ├── BACKEND.md                   ← Backend module and layer architecture
+│   └── WORKFLOW.md                  ← End-to-end walkthrough: boot, login, and one pass through every page
 │
 ├── frontend/                        ← React + Vite SPA
 │   ├── index.html                   ← HTML entry point (loads Inter font)
@@ -383,33 +391,30 @@ TransitOps/                          ← Git repository root
 │           └── Expenses.tsx
 │
 └── backend/                         ← FastAPI REST API
+    ├── create_db.py                 ← One-off script: creates the `transitops` DB if missing
     ├── requirements.txt             ← Python dependencies
     ├── .env.example                 ← DATABASE_URL + SECRET_KEY template
     └── app/
-        ├── main.py                  ← App factory, router registration, startup
+        ├── main.py                  ← App factory, router registration, startup hook (calls init_db())
         ├── core/
         │   ├── config.py            ← Pydantic Settings (reads .env)
-        │   ├── security.py          ← JWT + bcrypt utilities
-        │   └── deps.py              ← get_db(), get_current_user() dependencies
+        │   └── deps.py              ← get_db(), get_current_user() (unused by any route today)
         ├── db/
-        │   ├── database.py          ← SQLAlchemy engine + SessionLocal + Base
-        │   └── seed.py              ← Auto-seeder (runs if DB is empty)
+        │   ├── database.py          ← SQLAlchemy engine + SessionLocal
+        │   └── init_db.py           ← create_all() + seed (runs on every startup, idempotent)
         ├── models/                  ← SQLAlchemy ORM table classes
-        │   ├── enums.py             ← Python Enum for status fields
-        │   ├── lookup.py            ← Reference table models
-        │   ├── user.py
-        │   ├── vehicle.py
-        │   ├── driver.py
-        │   ├── trip.py
-        │   ├── maintenance.py
-        │   └── expense.py
+        │   ├── base.py              ← declarative Base
+        │   ├── enums.py             ← Python Enum for status/type fields
+        │   ├── core.py              ← User, Vehicle, Driver, Trip, MaintenanceRecord, FuelLog, Expense
+        │   └── lookups.py           ← Region, VehicleType, LicenseCategory
         ├── schemas/                 ← Pydantic request/response schemas
         │   ├── user.py
         │   ├── vehicle.py
         │   ├── driver.py
         │   ├── trip.py
         │   ├── maintenance.py
-        │   └── expense.py
+        │   ├── expense.py
+        │   └── analytics.py
         └── api/routes/              ← FastAPI APIRouter per domain
             ├── auth.py
             ├── lookup.py
@@ -418,7 +423,7 @@ TransitOps/                          ← Git repository root
             ├── trips.py
             ├── maintenance.py
             ├── expenses.py
-            └── dashboard.py
+            └── analytics.py
 ```
 
 ---

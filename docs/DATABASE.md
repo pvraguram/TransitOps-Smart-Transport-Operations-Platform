@@ -750,61 +750,54 @@ This creates all tables from SQLAlchemy model definitions if they don't already 
 
 ## 13. Seeder Strategy
 
-The seeder (`db/seed.py`) runs on every startup but only inserts data when tables are **empty**:
+The seeder lives in `db/init_db.py` (there is no `seed.py`) and is called from `main.py`'s startup event on
+**every** server boot — not just the first one. Each step is individually guarded, so it's idempotent:
 
 ```python
-def seed_data(db: Session):
-    # Guard: only seed if no users exist
-    if db.query(User).count() > 0:
-        return
+def init_db():
+    Base.metadata.create_all(bind=engine)
 
-    # 1. Seed lookup tables first (no dependencies)
-    seed_vehicle_types(db)
-    seed_regions(db)
-    seed_license_categories(db)
-    seed_maintenance_types(db)
-    seed_expense_categories(db)
+    if not db.query(Region).first():
+        db.add_all([Region(name="Delhi NCR"), Region(name="Mumbai Metro"), Region(name="Bangalore Hub")])
 
-    # 2. Seed users
-    admin = User(
-        email="admin@transitops.com",
-        hashed_password=hash_password("admin123"),
-        full_name="System Administrator",
-        is_active=True
-    )
-    db.add(admin)
+    if not db.query(VehicleType).first():
+        db.add_all([VehicleType(name="Heavy Truck"), VehicleType(name="Light Commercial"), VehicleType(name="Van")])
+
+    if not db.query(LicenseCategory).first():
+        db.add_all([LicenseCategory(name="HMV"), LicenseCategory(name="LMV")])
+
     db.commit()
 
-    # 3. Seed vehicles (depends on vehicle_types + regions)
-    seed_vehicles(db)
+    if not db.query(User).filter(User.email == "admin@transitops.com").first():
+        db.add(User(email="admin@transitops.com", hashed_password=get_password_hash("admin123"),
+                     role="Fleet Manager", full_name="Admin"))
+        db.commit()
 
-    # 4. Seed drivers (depends on license_categories)
-    seed_drivers(db)
+    if not db.query(Vehicle).first():
+        db.add(Vehicle(registration_number="KA-01-AB-1234", name_model="Tata Ace Gold", type="Van",
+                        max_load_capacity=10.5, odometer=15000, acquisition_cost=850000,
+                        region_id=<first region>.id))
+        db.commit()
 
-    # 5. Seed trips (depends on vehicles + drivers)
-    seed_trips(db)
-
-    # 6. Seed maintenance (depends on vehicles + maintenance_types)
-    seed_maintenance(db)
-
-    # 7. Seed fuel logs + expenses (depends on vehicles + trips)
-    seed_fuel_logs(db)
-    seed_expenses(db)
+    if not db.query(Driver).first():
+        db.add(Driver(first_name="Ramesh", last_name="Kumar", license_number="DL-142023",
+                       license_category="LMV", license_expiry_date=<today + 2 years>,
+                       contact_number="+91 90000 00000", region_id=<first region>.id))
+        db.commit()
 ```
 
-### Seeded Data Summary
+This is intentionally minimal — a handful of rows to make the app immediately usable after a fresh clone,
+not a realistic demo dataset. There is no seeded data for trips, maintenance records, fuel logs, or
+expenses; those tables start empty until a user creates records through the UI.
+
+### Seeded Data Summary (actual)
 
 | Table | Records | Notes |
 |---|---|---|
-| `vehicle_types` | 4 | Bus, Truck, Van, Motorcycle |
-| `regions` | 5 | Nairobi, Mombasa, Kisumu, Nakuru, Eldoret |
-| `license_categories` | 5 | A, B, C, D, E |
-| `maintenance_types` | 4 | Preventive, Corrective, Emergency, Inspection |
-| `expense_categories` | 5 | Toll, Repair, Permit, Insurance, Other |
-| `users` | 1 | admin@transitops.com / admin123 |
-| `vehicles` | 10 | Mixed types, regions, statuses |
-| `drivers` | 8 | Mixed categories, statuses, safety scores |
-| `trips` | 10 | Draft/Dispatched/Completed/Cancelled mix |
-| `maintenance_records` | 8 | Active and completed |
-| `fuel_logs` | 8 | Linked to various vehicles and trips |
-| `expenses` | 8 | Mixed categories |
+| `regions` | 3 | Delhi NCR, Mumbai Metro, Bangalore Hub |
+| `vehicle_types` | 3 | Heavy Truck, Light Commercial, Van — reference data only, not FK'd from `vehicles` |
+| `license_categories` | 2 | HMV, LMV — reference data only, not FK'd from `drivers` |
+| `users` | 1 | `admin@transitops.com` / `admin123`, role `Fleet Manager` |
+| `vehicles` | 1 | `KA-01-AB-1234`, status `available` |
+| `drivers` | 1 | Ramesh Kumar, status `available` |
+| `trips`, `maintenance_records`, `fuel_logs`, `expenses` | 0 | Not seeded — created via the app as you use it |
