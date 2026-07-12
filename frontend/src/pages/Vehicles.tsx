@@ -1,93 +1,80 @@
-﻿import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Car, Plus, Search, X } from "lucide-react";
+import { vehicleApi } from "../services/api";
 
-// ---- Palette ----
-// #1D1A39 - deep navy
-// #451952 - deep purple
-// #662549 - wine
-// #AE445A - rose
-// #F39F5A - orange
-// #E8BCB9 - blush
+type VehicleStatus = "available" | "on_trip" | "in_shop" | "retired";
 
-type VehicleStatus = "Available" | "On Trip" | "In Shop" | "Retired";
-type VehicleType = "Van" | "Truck" | "MXD";
-
-interface Vehicle {
-  id: string;
-  fuelNoStandard: string;
-  ownership: string;
-  type: VehicleType;
-  capacity: string;
-  dispatcher: number;
-  realCost: number;
-  status: VehicleStatus;
-}
-
-const initialVehicles: Vehicle[] = [
-  { id: "1", fuelNoStandard: "6TOU82H1H", ownership: "VAN-05", type: "Van", capacity: "200 kg", dispatcher: 34000, realCost: 660000, status: "Available" },
-  { id: "2", fuelNoStandard: "6TOU8449T", ownership: "TRUCK-8", type: "Truck", capacity: "8 Ton", dispatcher: 182000, realCost: 2480000, status: "On Trip" },
-  { id: "3", fuelNoStandard: "6TOU8260", ownership: "MXD-03", type: "MXD", capacity: "1 Ton", dispatcher: 64000, realCost: 410000, status: "In Shop" },
-  { id: "4", fuelNoStandard: "6TOU8009F", ownership: "VAN-09", type: "Van", capacity: "150 kg", dispatcher: 24900, realCost: 540000, status: "Retired" },
-];
-
-function StatusPill({ status }: { status: VehicleStatus }) {
-  const styles: Record<VehicleStatus, string> = {
-    Available: "bg-emerald-500/15 text-emerald-600 border border-emerald-500/30",
-    "On Trip": "bg-blue-500/15 text-blue-600 border border-blue-500/30",
-    "In Shop": "bg-[#F39F5A]/20 text-[#F39F5A] border border-[#F39F5A]/40",
-    Retired: "bg-[#AE445A]/15 text-[#AE445A] border border-[#AE445A]/30",
+function StatusPill({ status }: { status: string }) {
+  const styles: Record<string, string> = {
+    available: "bg-emerald-500/15 text-emerald-600 border border-emerald-500/30",
+    on_trip: "bg-blue-500/15 text-blue-600 border border-blue-500/30",
+    in_shop: "bg-[#F39F5A]/20 text-[#F39F5A] border border-[#F39F5A]/40",
+    retired: "bg-[#AE445A]/15 text-[#AE445A] border border-[#AE445A]/30",
   };
   return (
-    <span className={`px-2.5 py-1 rounded-full text-xs font-semibold whitespace-nowrap ${styles[status]}`}>
-      {status}
+    <span className={`px-2.5 py-1 rounded-full text-xs font-semibold whitespace-nowrap capitalize ${styles[status] || ""}`}>
+      {status.replace("_", " ")}
     </span>
   );
 }
 
 export default function Vehicles() {
-  const [vehicles, setVehicles] = useState<Vehicle[]>(initialVehicles);
+  const [vehicles, setVehicles] = useState<any[]>([]);
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState("All");
   const [statusFilter, setStatusFilter] = useState("All");
   const [showAddVehicle, setShowAddVehicle] = useState(false);
 
-  const [newOwnership, setNewOwnership] = useState("");
-  const [newType, setNewType] = useState<VehicleType>("Van");
+  const [newRegNo, setNewRegNo] = useState("");
+  const [newNameModel, setNewNameModel] = useState("");
+  const [newType, setNewType] = useState("Van");
   const [newCapacity, setNewCapacity] = useState("");
-  const [newFuelNoStandard, setNewFuelNoStandard] = useState("");
-  const [newRealCost, setNewRealCost] = useState("");
+  const [newCost, setNewCost] = useState("");
+
+  const loadVehicles = async () => {
+    try {
+      const res = await vehicleApi.getAll();
+      setVehicles(res.data);
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  useEffect(() => {
+    loadVehicles();
+  }, []);
 
   const filteredVehicles = vehicles.filter((v) => {
     const matchesSearch =
-      v.ownership.toLowerCase().includes(search.toLowerCase()) ||
-      v.fuelNoStandard.toLowerCase().includes(search.toLowerCase());
+      v.name_model?.toLowerCase().includes(search.toLowerCase()) ||
+      v.registration_number?.toLowerCase().includes(search.toLowerCase());
     const matchesType = typeFilter === "All" || v.type === typeFilter;
     const matchesStatus = statusFilter === "All" || v.status === statusFilter;
     return matchesSearch && matchesType && matchesStatus;
   });
 
-  const handleAddVehicle = (e: React.FormEvent) => {
+  const handleAddVehicle = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newOwnership || !newCapacity) return;
+    if (!newRegNo || !newNameModel) return;
 
-    const newVehicle: Vehicle = {
-      id: Date.now().toString(),
-      fuelNoStandard: newFuelNoStandard || "—",
-      ownership: newOwnership,
-      type: newType,
-      capacity: newCapacity,
-      dispatcher: 0,
-      realCost: Number(newRealCost) || 0,
-      status: "Available",
-    };
-
-    setVehicles([newVehicle, ...vehicles]);
-    setNewOwnership("");
-    setNewType("Van");
-    setNewCapacity("");
-    setNewFuelNoStandard("");
-    setNewRealCost("");
-    setShowAddVehicle(false);
+    try {
+      await vehicleApi.create({
+        registration_number: newRegNo,
+        name_model: newNameModel,
+        type: newType,
+        max_load_capacity: Number(newCapacity) || 0,
+        acquisition_cost: Number(newCost) || 0,
+      });
+      loadVehicles();
+      setShowAddVehicle(false);
+      setNewRegNo("");
+      setNewNameModel("");
+      setNewType("Van");
+      setNewCapacity("");
+      setNewCost("");
+    } catch (e) {
+      console.error(e);
+    }
   };
 
   return (
@@ -116,7 +103,7 @@ export default function Vehicles() {
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search by city, vehicle..."
+            placeholder="Search by model, reg no..."
             className="w-full pl-9 pr-3 py-2.5 text-sm border border-[#662549]/20 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-[#F39F5A]/40"
           />
         </div>
@@ -136,10 +123,10 @@ export default function Vehicles() {
           className="px-3 py-2.5 text-sm border border-[#662549]/20 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-[#F39F5A]/40"
         >
           <option value="All">Status: All</option>
-          <option value="Available">Available</option>
-          <option value="On Trip">On Trip</option>
-          <option value="In Shop">In Shop</option>
-          <option value="Retired">Retired</option>
+          <option value="available">Available</option>
+          <option value="on_trip">On Trip</option>
+          <option value="in_shop">In Shop</option>
+          <option value="retired">Retired</option>
         </select>
       </div>
 
@@ -148,11 +135,11 @@ export default function Vehicles() {
         <table className="w-full text-sm">
           <thead>
             <tr className="bg-[#E8BCB9]/20 text-left text-[#662549] text-xs font-semibold uppercase">
-              <th className="px-5 py-3">Fuel No. Standard</th>
-              <th className="px-5 py-3">Ownership</th>
+              <th className="px-5 py-3">Registration No.</th>
+              <th className="px-5 py-3">Model / Name</th>
               <th className="px-5 py-3">Type</th>
-              <th className="px-5 py-3">Capacity</th>
-              <th className="px-5 py-3">Dispatcher (₹)</th>
+              <th className="px-5 py-3">Capacity (kg)</th>
+              <th className="px-5 py-3">Odometer</th>
               <th className="px-5 py-3">Real Cost (₹)</th>
               <th className="px-5 py-3">Status</th>
             </tr>
@@ -160,12 +147,12 @@ export default function Vehicles() {
           <tbody>
             {filteredVehicles.map((v) => (
               <tr key={v.id} className="border-t border-[#662549]/10 hover:bg-[#E8BCB9]/10">
-                <td className="px-5 py-3 font-medium text-[#1D1A39]">{v.fuelNoStandard}</td>
-                <td className="px-5 py-3 text-[#451952]/80">{v.ownership}</td>
+                <td className="px-5 py-3 font-medium text-[#1D1A39]">{v.registration_number}</td>
+                <td className="px-5 py-3 text-[#451952]/80">{v.name_model}</td>
                 <td className="px-5 py-3 text-[#451952]/80">{v.type}</td>
-                <td className="px-5 py-3 text-[#451952]/80">{v.capacity}</td>
-                <td className="px-5 py-3 text-[#451952]/80">₹{v.dispatcher.toLocaleString()}</td>
-                <td className="px-5 py-3 font-semibold text-[#1D1A39]">₹{v.realCost.toLocaleString()}</td>
+                <td className="px-5 py-3 text-[#451952]/80">{v.max_load_capacity}</td>
+                <td className="px-5 py-3 text-[#451952]/80">{v.odometer?.toLocaleString()} km</td>
+                <td className="px-5 py-3 font-semibold text-[#1D1A39]">₹{v.acquisition_cost?.toLocaleString()}</td>
                 <td className="px-5 py-3">
                   <StatusPill status={v.status} />
                 </td>
@@ -208,11 +195,23 @@ export default function Vehicles() {
             <form onSubmit={handleAddVehicle} className="space-y-4">
               <div>
                 <label className="block text-xs font-semibold text-[#662549] mb-1.5 uppercase">
-                  Vehicle ID / Ownership
+                  Registration No.
                 </label>
                 <input
-                  value={newOwnership}
-                  onChange={(e) => setNewOwnership(e.target.value)}
+                  value={newRegNo}
+                  onChange={(e) => setNewRegNo(e.target.value)}
+                  placeholder="e.g. MH-12-AB-1234"
+                  className="w-full px-3 py-2.5 text-sm border border-[#662549]/20 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#F39F5A]/40"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-[#662549] mb-1.5 uppercase">
+                  Model / Name
+                </label>
+                <input
+                  value={newNameModel}
+                  onChange={(e) => setNewNameModel(e.target.value)}
                   placeholder="e.g. VAN-06"
                   className="w-full px-3 py-2.5 text-sm border border-[#662549]/20 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#F39F5A]/40"
                 />
@@ -224,7 +223,7 @@ export default function Vehicles() {
                 </label>
                 <select
                   value={newType}
-                  onChange={(e) => setNewType(e.target.value as VehicleType)}
+                  onChange={(e) => setNewType(e.target.value)}
                   className="w-full px-3 py-2.5 text-sm border border-[#662549]/20 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#F39F5A]/40 bg-white"
                 >
                   <option value="Van">Van</option>
@@ -235,24 +234,13 @@ export default function Vehicles() {
 
               <div>
                 <label className="block text-xs font-semibold text-[#662549] mb-1.5 uppercase">
-                  Capacity
+                  Capacity (kg)
                 </label>
                 <input
                   value={newCapacity}
                   onChange={(e) => setNewCapacity(e.target.value)}
-                  placeholder="e.g. 400 kg"
-                  className="w-full px-3 py-2.5 text-sm border border-[#662549]/20 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#F39F5A]/40"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-[#662549] mb-1.5 uppercase">
-                  Fuel No. Standard
-                </label>
-                <input
-                  value={newFuelNoStandard}
-                  onChange={(e) => setNewFuelNoStandard(e.target.value)}
-                  placeholder="e.g. 6TOU82H1H"
+                  type="number"
+                  placeholder="e.g. 4000"
                   className="w-full px-3 py-2.5 text-sm border border-[#662549]/20 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#F39F5A]/40"
                 />
               </div>
@@ -262,8 +250,8 @@ export default function Vehicles() {
                   Real Cost (₹)
                 </label>
                 <input
-                  value={newRealCost}
-                  onChange={(e) => setNewRealCost(e.target.value)}
+                  value={newCost}
+                  onChange={(e) => setNewCost(e.target.value)}
                   type="number"
                   placeholder="0"
                   className="w-full px-3 py-2.5 text-sm border border-[#662549]/20 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#F39F5A]/40"

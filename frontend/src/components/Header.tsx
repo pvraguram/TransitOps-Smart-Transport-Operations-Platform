@@ -1,4 +1,4 @@
-﻿import { Search, Bell } from "lucide-react";
+import { Search, Bell } from "lucide-react";
 import { useAuth } from "../hooks/useAuth";
 
 interface HeaderProps {
@@ -19,10 +19,6 @@ export default function Header({ searchPlaceholder = "Search..." }: HeaderProps)
       </div>
 
       <div className="flex items-center gap-4 flex-shrink-0">
-        <button className="relative text-[#662549]/60 hover:text-[#662549] transition">
-          <Bell className="w-5 h-5" />
-          <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-[#AE445A]" />
-        </button>
         <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-[#451952]/10 text-[#451952] border border-[#451952]/20">
           {user?.role ?? "Guest"}
         </span>

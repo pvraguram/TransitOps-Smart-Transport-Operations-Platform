@@ -7,6 +7,7 @@ class TripBase(BaseModel):
     vehicle_id: int
     driver_id: int
     cargo_weight: float
+    planned_distance: float
     origin: str
     destination: str
     start_time: Optional[datetime] = None
@@ -20,6 +21,7 @@ class TripDispatch(BaseModel):
     vehicle_id: int
     driver_id: int
     cargo_weight: float
+    planned_distance: float
     origin: str
     destination: str
 

@@ -7,10 +7,12 @@ class DriverBase(BaseModel):
     first_name: str
     last_name: str
     license_number: str
-    license_expiry_date: Optional[date] = None
-    license_category_id: int
+    license_category: str
+    license_expiry_date: date
+    contact_number: str
+    safety_score: Optional[int] = 100
     status: Optional[DriverStatus] = DriverStatus.available
-    region_id: int
+    region_id: Optional[int] = None
 
 class DriverCreate(DriverBase):
     pass

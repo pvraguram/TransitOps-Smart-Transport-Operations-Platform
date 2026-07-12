@@ -3,7 +3,7 @@ from passlib.context import CryptContext
 from app.db.database import engine, SessionLocal
 from app.models.base import Base
 # Import all models to ensure they are registered with the Base
-from app.models.lookups import VehicleType, Region, LicenseCategory
+from app.models.lookups import Region
 from app.models.core import User, Vehicle, Driver, Trip, MaintenanceRecord, FuelLog, Expense
 
 logging.basicConfig(level=logging.INFO)

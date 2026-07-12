@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Mail, Lock, Eye, EyeOff, Zap, ArrowRight } from "lucide-react";
+import { Mail, Lock, Eye, EyeOff, Truck, ArrowRight } from "lucide-react";
 import { useAuth } from "../hooks/useAuth";
 
 type Role = "Fleet Manager" | "Dispatcher" | "Safety Officer" | "Financial Analyst";
@@ -63,7 +63,7 @@ export default function Login() {
 
         <div className="relative z-10 flex items-center gap-3">
           <div className="w-10 h-10 rounded-lg bg-white/10 flex items-center justify-center backdrop-blur-sm">
-            <Zap className="w-5 h-5 text-white" fill="white" />
+            <Truck className="w-5 h-5 text-white" fill="white" />
           </div>
           <div>
             <p className="text-white font-semibold leading-tight">TransitOps</p>
@@ -118,7 +118,7 @@ export default function Login() {
         <div className="w-full max-w-md">
           <div className="lg:hidden flex items-center gap-3 mb-8">
             <div className="w-10 h-10 rounded-lg bg-gray-900 flex items-center justify-center">
-              <Zap className="w-5 h-5 text-white" fill="white" />
+              <Truck className="w-5 h-5 text-white" fill="white" />
             </div>
             <div>
               <p className="font-semibold leading-tight text-gray-900">TransitOps</p>

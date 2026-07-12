@@ -1,4 +1,4 @@
-﻿import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "./context/AuthContext";
 import { useAuth } from "./hooks/useAuth";
 import AppLayout from "./layouts/AppLayout";
@@ -10,6 +10,7 @@ import Drivers from "./pages/Drivers";
 import Trips from "./pages/Trips";
 import Maintenance from "./pages/Maintenance";
 import Expenses from "./pages/Expenses";
+import Settings from "./pages/Settings";
 
 // Protects routes behind login — redirects to /login if not authenticated
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -45,6 +46,7 @@ function AppRoutes() {
         <Route path="/trips" element={<Trips />} />
         <Route path="/maintenance" element={<Maintenance />} />
         <Route path="/expenses" element={<Expenses />} />
+        <Route path="/settings" element={<Settings />} />
       </Route>
 
       {/* Fallback */}

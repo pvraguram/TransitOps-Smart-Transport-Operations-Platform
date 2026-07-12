@@ -1,7 +1,7 @@
-﻿import axios, { AxiosInstance, AxiosError } from "axios";
+import axios, { AxiosInstance, AxiosError } from "axios";
 
 // ---- Base config ----
-const BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000/api";
+const BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000/api";
 
 const api: AxiosInstance = axios.create({
   baseURL: BASE_URL,
@@ -72,7 +72,7 @@ export const tripApi = {
   getById: (id: string) => api.get(`/trips/${id}`),
   create: (data: Record<string, unknown>) => api.post("/trips", data),
   update: (id: string, data: Record<string, unknown>) => api.put(`/trips/${id}`, data),
-  dispatch: (id: string) => api.post(`/trips/${id}/dispatch`),
+  dispatch: (data: Record<string, unknown>) => api.post(`/trips/dispatch`, data),
   delete: (id: string) => api.delete(`/trips/${id}`),
 };
 
@@ -89,8 +89,8 @@ export const maintenanceApi = {
 export const expenseApi = {
   getFuelLogs: () => api.get("/expenses/fuel"),
   logFuel: (data: Record<string, unknown>) => api.post("/expenses/fuel", data),
-  getOtherExpenses: () => api.get("/expenses/other"),
-  addExpense: (data: Record<string, unknown>) => api.post("/expenses/other", data),
+  getExpenses: () => api.get("/expenses"),
+  addExpense: (data: Record<string, unknown>) => api.post("/expenses", data),
 };
 
 // ---- Dashboard / Analytics ----

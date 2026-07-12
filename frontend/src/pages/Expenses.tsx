@@ -1,66 +1,103 @@
-﻿import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Fuel, Plus, Receipt, TrendingUp } from "lucide-react";
-
-// ---- Palette ----
-// #1D1A39 - deep navy (text/dark bg)
-// #451952 - deep purple (sidebar/headers)
-// #662549 - wine (accents)
-// #AE445A - rose (highlights/danger)
-// #F39F5A - orange (primary actions)
-// #E8BCB9 - blush (light bg/badges)
+import { expenseApi, vehicleApi, tripApi } from "../services/api";
 
 type Status = "Available" | "Completed" | "Pending";
 
-interface FuelLog {
-  id: string;
-  vehicle: string;
-  date: string;
-  litres: number;
-  cost: number;
-}
-
-interface OtherExpense {
-  id: string;
-  trip: string;
-  vehicle: string;
-  toll: number;
-  other: number;
-  amountClaimed: number;
-  status: Status;
-}
-
-const initialFuelLogs: FuelLog[] = [
-  { id: "1", vehicle: "VAN-05", date: "05 Jul 2026", litres: 42, cost: 3850 },
-  { id: "2", vehicle: "TRUCK-8", date: "06 Jul 2026", litres: 80, cost: 9400 },
-  { id: "3", vehicle: "MXD-03", date: "06 Jul 2026", litres: 28, cost: 2950 },
-];
-
-const initialOtherExpenses: OtherExpense[] = [
-  { id: "1", trip: "TR001", vehicle: "VAN-05", toll: 120, other: 0, amountClaimed: 120, status: "Available" },
-  { id: "2", trip: "TR002", vehicle: "TRUCK-8", toll: 340, other: 60, amountClaimed: 18000, status: "Completed" },
-];
-
-function StatusPill({ status }: { status: Status }) {
-  const styles: Record<Status, string> = {
+function StatusPill({ status }: { status: string }) {
+  const styles: Record<string, string> = {
     Available: "bg-[#F39F5A]/20 text-[#F39F5A] border border-[#F39F5A]/40",
     Completed: "bg-emerald-500/15 text-emerald-600 border border-emerald-500/30",
     Pending: "bg-[#AE445A]/15 text-[#AE445A] border border-[#AE445A]/30",
   };
   return (
-    <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${styles[status]}`}>
-      {status}
+    <span className={`px-2.5 py-1 rounded-full text-xs font-semibold capitalize ${styles[status] || ""}`}>
+      {status.replace("_", " ")}
     </span>
   );
 }
 
 export default function Expenses() {
-  const [fuelLogs] = useState<FuelLog[]>(initialFuelLogs);
-  const [otherExpenses] = useState<OtherExpense[]>(initialOtherExpenses);
+  const [fuelLogs, setFuelLogs] = useState<any[]>([]);
+  const [otherExpenses, setOtherExpenses] = useState<any[]>([]);
+  const [vehicles, setVehicles] = useState<any[]>([]);
+  const [trips, setTrips] = useState<any[]>([]);
+
   const [showLogFuel, setShowLogFuel] = useState(false);
   const [showAddExpense, setShowAddExpense] = useState(false);
 
+  // Form states
+  const [fuelVehicleId, setFuelVehicleId] = useState("");
+  const [fuelLitres, setFuelLitres] = useState("");
+  const [fuelCost, setFuelCost] = useState("");
+
+  const [expenseTripId, setExpenseTripId] = useState("");
+  const [expenseCategory, setExpenseCategory] = useState("Toll");
+  const [expenseAmount, setExpenseAmount] = useState("");
+  const [expenseDescription, setExpenseDescription] = useState("");
+
+  const loadData = async () => {
+    try {
+      const [fuelRes, expRes, vehRes, tripRes] = await Promise.all([
+        expenseApi.getFuelLogs(),
+        expenseApi.getExpenses(),
+        vehicleApi.getAll(),
+        tripApi.getAll()
+      ]);
+      setFuelLogs(fuelRes.data);
+      setOtherExpenses(expRes.data);
+      setVehicles(vehRes.data);
+      setTrips(tripRes.data);
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  const handleSaveFuel = async () => {
+    if (!fuelVehicleId || !fuelLitres || !fuelCost) return;
+    try {
+      await expenseApi.logFuel({
+        vehicle_id: Number(fuelVehicleId),
+        litres: Number(fuelLitres),
+        cost: Number(fuelCost),
+        date: new Date().toISOString()
+      });
+      setShowLogFuel(false);
+      setFuelVehicleId("");
+      setFuelLitres("");
+      setFuelCost("");
+      loadData();
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const handleSaveExpense = async () => {
+    if (!expenseTripId || !expenseAmount) return;
+    try {
+      await expenseApi.addExpense({
+        trip_id: Number(expenseTripId),
+        amount: Number(expenseAmount),
+        category: expenseCategory,
+        description: expenseDescription || null,
+        date: new Date().toISOString()
+      });
+      setShowAddExpense(false);
+      setExpenseTripId("");
+      setExpenseAmount("");
+      setExpenseDescription("");
+      loadData();
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
   const totalFuelCost = fuelLogs.reduce((sum, f) => sum + f.cost, 0);
-  const totalOtherCost = otherExpenses.reduce((sum, e) => sum + e.amountClaimed, 0);
+  const totalOtherCost = otherExpenses.reduce((sum, e) => sum + e.amount, 0);
   const totalOperationalCost = totalFuelCost + totalOtherCost;
 
   return (
@@ -121,7 +158,7 @@ export default function Expenses() {
         <table className="w-full text-sm">
           <thead>
             <tr className="bg-[#E8BCB9]/20 text-left text-[#662549] text-xs font-semibold uppercase">
-              <th className="px-5 py-3">Vehicle</th>
+              <th className="px-5 py-3">Vehicle ID</th>
               <th className="px-5 py-3">Date</th>
               <th className="px-5 py-3">Litres</th>
               <th className="px-5 py-3">Cost (₹)</th>
@@ -130,12 +167,17 @@ export default function Expenses() {
           <tbody>
             {fuelLogs.map((log) => (
               <tr key={log.id} className="border-t border-[#662549]/10 hover:bg-[#E8BCB9]/10">
-                <td className="px-5 py-3 font-medium text-[#1D1A39]">{log.vehicle}</td>
-                <td className="px-5 py-3 text-[#451952]/80">{log.date}</td>
+                <td className="px-5 py-3 font-medium text-[#1D1A39]">{log.vehicle_id}</td>
+                <td className="px-5 py-3 text-[#451952]/80">{new Date(log.date).toLocaleDateString()}</td>
                 <td className="px-5 py-3 text-[#451952]/80">{log.litres} L</td>
                 <td className="px-5 py-3 font-semibold text-[#1D1A39]">₹{log.cost.toLocaleString()}</td>
               </tr>
             ))}
+            {fuelLogs.length === 0 && (
+              <tr>
+                <td colSpan={4} className="px-5 py-8 text-center text-[#662549]/50">No fuel logs found.</td>
+              </tr>
+            )}
           </tbody>
         </table>
       </div>
@@ -143,32 +185,35 @@ export default function Expenses() {
       {/* Other Expenses Table */}
       <div className="bg-white rounded-xl border border-[#662549]/15 shadow-sm overflow-hidden">
         <div className="px-5 py-4 border-b border-[#662549]/10">
-          <h2 className="font-semibold text-[#1D1A39]">Other Expenses (Toll / Misc)</h2>
+          <h2 className="font-semibold text-[#1D1A39]">Other Expenses</h2>
         </div>
         <table className="w-full text-sm">
           <thead>
             <tr className="bg-[#E8BCB9]/20 text-left text-[#662549] text-xs font-semibold uppercase">
-              <th className="px-5 py-3">Trip</th>
-              <th className="px-5 py-3">Vehicle</th>
-              <th className="px-5 py-3">Toll (₹)</th>
-              <th className="px-5 py-3">Other (₹)</th>
-              <th className="px-5 py-3">Amount Claimed (₹)</th>
+              <th className="px-5 py-3">Trip ID</th>
+              <th className="px-5 py-3">Category</th>
+              <th className="px-5 py-3">Description</th>
+              <th className="px-5 py-3">Amount (₹)</th>
               <th className="px-5 py-3">Status</th>
             </tr>
           </thead>
           <tbody>
             {otherExpenses.map((exp) => (
               <tr key={exp.id} className="border-t border-[#662549]/10 hover:bg-[#E8BCB9]/10">
-                <td className="px-5 py-3 font-medium text-[#1D1A39]">{exp.trip}</td>
-                <td className="px-5 py-3 text-[#451952]/80">{exp.vehicle}</td>
-                <td className="px-5 py-3 text-[#451952]/80">₹{exp.toll}</td>
-                <td className="px-5 py-3 text-[#451952]/80">₹{exp.other}</td>
-                <td className="px-5 py-3 font-semibold text-[#1D1A39]">₹{exp.amountClaimed.toLocaleString()}</td>
+                <td className="px-5 py-3 font-medium text-[#1D1A39]">TR-{exp.trip_id}</td>
+                <td className="px-5 py-3 text-[#451952]/80">{exp.category}</td>
+                <td className="px-5 py-3 text-[#451952]/80">{exp.description || "-"}</td>
+                <td className="px-5 py-3 font-semibold text-[#1D1A39]">₹{exp.amount.toLocaleString()}</td>
                 <td className="px-5 py-3">
                   <StatusPill status={exp.status} />
                 </td>
               </tr>
             ))}
+            {otherExpenses.length === 0 && (
+              <tr>
+                <td colSpan={5} className="px-5 py-8 text-center text-[#662549]/50">No expenses found.</td>
+              </tr>
+            )}
           </tbody>
         </table>
       </div>
@@ -179,18 +224,28 @@ export default function Expenses() {
           <div className="bg-white rounded-xl w-full max-w-md p-6">
             <h3 className="font-bold text-lg text-[#1D1A39] mb-4">Log Fuel</h3>
             <div className="space-y-3">
-              <input
-                placeholder="Vehicle"
-                className="w-full px-3 py-2.5 text-sm border border-[#662549]/20 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#F39F5A]/40"
-              />
+              <select
+                value={fuelVehicleId}
+                onChange={(e) => setFuelVehicleId(e.target.value)}
+                className="w-full px-3 py-2.5 text-sm border border-[#662549]/20 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#F39F5A]/40 bg-white"
+              >
+                <option value="">Select vehicle</option>
+                {vehicles.map((v) => (
+                  <option key={v.id} value={v.id}>{v.registration_number}</option>
+                ))}
+              </select>
               <input
                 placeholder="Litres"
                 type="number"
+                value={fuelLitres}
+                onChange={(e) => setFuelLitres(e.target.value)}
                 className="w-full px-3 py-2.5 text-sm border border-[#662549]/20 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#F39F5A]/40"
               />
               <input
                 placeholder="Cost (₹)"
                 type="number"
+                value={fuelCost}
+                onChange={(e) => setFuelCost(e.target.value)}
                 className="w-full px-3 py-2.5 text-sm border border-[#662549]/20 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#F39F5A]/40"
               />
             </div>
@@ -202,7 +257,7 @@ export default function Expenses() {
                 Cancel
               </button>
               <button
-                onClick={() => setShowLogFuel(false)}
+                onClick={handleSaveFuel}
                 className="flex-1 py-2.5 text-sm font-semibold rounded-lg bg-[#F39F5A] text-[#1D1A39] hover:brightness-95"
               >
                 Save
@@ -218,18 +273,36 @@ export default function Expenses() {
           <div className="bg-white rounded-xl w-full max-w-md p-6">
             <h3 className="font-bold text-lg text-[#1D1A39] mb-4">Add Expense</h3>
             <div className="space-y-3">
+              <select
+                value={expenseTripId}
+                onChange={(e) => setExpenseTripId(e.target.value)}
+                className="w-full px-3 py-2.5 text-sm border border-[#662549]/20 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#F39F5A]/40 bg-white"
+              >
+                <option value="">Select Trip</option>
+                {trips.map((t) => (
+                  <option key={t.id} value={t.id}>TR-{t.id}: {t.origin} → {t.destination}</option>
+                ))}
+              </select>
+              <select
+                value={expenseCategory}
+                onChange={(e) => setExpenseCategory(e.target.value)}
+                className="w-full px-3 py-2.5 text-sm border border-[#662549]/20 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#F39F5A]/40 bg-white"
+              >
+                <option value="Toll">Toll</option>
+                <option value="Food">Food</option>
+                <option value="Misc">Misc</option>
+              </select>
               <input
-                placeholder="Trip ID"
+                placeholder="Amount (₹)"
+                type="number"
+                value={expenseAmount}
+                onChange={(e) => setExpenseAmount(e.target.value)}
                 className="w-full px-3 py-2.5 text-sm border border-[#662549]/20 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#F39F5A]/40"
               />
               <input
-                placeholder="Toll (₹)"
-                type="number"
-                className="w-full px-3 py-2.5 text-sm border border-[#662549]/20 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#F39F5A]/40"
-              />
-              <input
-                placeholder="Other (₹)"
-                type="number"
+                placeholder="Description"
+                value={expenseDescription}
+                onChange={(e) => setExpenseDescription(e.target.value)}
                 className="w-full px-3 py-2.5 text-sm border border-[#662549]/20 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#F39F5A]/40"
               />
             </div>
@@ -241,7 +314,7 @@ export default function Expenses() {
                 Cancel
               </button>
               <button
-                onClick={() => setShowAddExpense(false)}
+                onClick={handleSaveExpense}
                 className="flex-1 py-2.5 text-sm font-semibold rounded-lg bg-[#451952] text-white hover:bg-[#662549]"
               >
                 Submit

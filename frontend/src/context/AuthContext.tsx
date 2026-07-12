@@ -1,10 +1,12 @@
-﻿import { createContext, useState, useEffect, ReactNode } from "react";
+import { createContext, useState, useEffect, ReactNode } from "react";
+import { authApi } from "../services/api";
 
 type Role = "Fleet Manager" | "Dispatcher" | "Safety Officer" | "Financial Analyst";
 
 interface User {
   email: string;
   role: Role;
+  token?: string;
 }
 
 interface AuthContextType {
@@ -34,19 +36,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     role: Role,
     remember: boolean
   ): Promise<boolean> => {
-    // Mock auth check — replace with real API call later
-    if (!email || !password) return false;
+    try {
+      const response = await authApi.login(email, password, role);
+      if (response.data && response.data.access_token) {
+        const userData: User = { email, role, token: response.data.access_token };
 
-    const userData: User = { email, role };
+        if (remember) {
+          localStorage.setItem("transitops_user", JSON.stringify(userData));
+        } else {
+          sessionStorage.setItem("transitops_user", JSON.stringify(userData));
+        }
 
-    if (remember) {
-      localStorage.setItem("transitops_user", JSON.stringify(userData));
-    } else {
-      sessionStorage.setItem("transitops_user", JSON.stringify(userData));
+        setUser(userData);
+        return true;
+      }
+      return false;
+    } catch (error) {
+      console.error("Login failed", error);
+      return false;
     }
-
-    setUser(userData);
-    return true;
   };
 
   const logout = () => {
