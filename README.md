@@ -1,7 +1,6 @@
 # TransitOps — Smart Transport Operations Platform
 
-A full-stack fleet management system built for a 4-person hackathon.
-
+A full-stack fleet management system.
 ---
 
 ## Tech Stack

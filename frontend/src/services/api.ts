@@ -1,7 +1,7 @@
-﻿import axios, { AxiosInstance, AxiosError } from "axios";
+import axios, { AxiosInstance, AxiosError } from "axios";
 
 // ---- Base config ----
-const BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000/api";
+const BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000/api";
 
 const api: AxiosInstance = axios.create({
   baseURL: BASE_URL,
@@ -45,6 +45,8 @@ api.interceptors.response.use(
 export const authApi = {
   login: (email: string, password: string, role: string) =>
     api.post("/auth/login", { email, password, role }),
+  register: (email: string, password: string, full_name: string, role: string) =>
+    api.post("/auth/register", { email, password, full_name, role }),
   logout: () => api.post("/auth/logout"),
 };
 
@@ -53,8 +55,6 @@ export const vehicleApi = {
   getAll: () => api.get("/vehicles"),
   getById: (id: string) => api.get(`/vehicles/${id}`),
   create: (data: Record<string, unknown>) => api.post("/vehicles", data),
-  update: (id: string, data: Record<string, unknown>) => api.put(`/vehicles/${id}`, data),
-  delete: (id: string) => api.delete(`/vehicles/${id}`),
 };
 
 // ---- Drivers ----
@@ -62,8 +62,6 @@ export const driverApi = {
   getAll: () => api.get("/drivers"),
   getById: (id: string) => api.get(`/drivers/${id}`),
   create: (data: Record<string, unknown>) => api.post("/drivers", data),
-  update: (id: string, data: Record<string, unknown>) => api.put(`/drivers/${id}`, data),
-  delete: (id: string) => api.delete(`/drivers/${id}`),
 };
 
 // ---- Trips ----
@@ -71,9 +69,7 @@ export const tripApi = {
   getAll: () => api.get("/trips"),
   getById: (id: string) => api.get(`/trips/${id}`),
   create: (data: Record<string, unknown>) => api.post("/trips", data),
-  update: (id: string, data: Record<string, unknown>) => api.put(`/trips/${id}`, data),
-  dispatch: (id: string) => api.post(`/trips/${id}/dispatch`),
-  delete: (id: string) => api.delete(`/trips/${id}`),
+  dispatch: (data: Record<string, unknown>) => api.post(`/trips/dispatch`, data),
 };
 
 // ---- Maintenance ----
@@ -81,16 +77,19 @@ export const maintenanceApi = {
   getAll: () => api.get("/maintenance"),
   getById: (id: string) => api.get(`/maintenance/${id}`),
   create: (data: Record<string, unknown>) => api.post("/maintenance", data),
-  update: (id: string, data: Record<string, unknown>) => api.put(`/maintenance/${id}`, data),
-  delete: (id: string) => api.delete(`/maintenance/${id}`),
+  // Backend expects status as query param: PUT /maintenance/{id}/status?status=completed
+  updateStatus: (id: string, status: string) =>
+    api.put(`/maintenance/${id}/status?status=${status}`),
 };
 
 // ---- Fuel & Expenses ----
 export const expenseApi = {
   getFuelLogs: () => api.get("/expenses/fuel"),
+  // Backend expects: vehicle_id, date, gallons, cost, odometer_reading
   logFuel: (data: Record<string, unknown>) => api.post("/expenses/fuel", data),
-  getOtherExpenses: () => api.get("/expenses/other"),
-  addExpense: (data: Record<string, unknown>) => api.post("/expenses/other", data),
+  getExpenses: () => api.get("/expenses"),
+  // Backend expects: trip_id, type (toll|parking|fine|other), amount, description, date
+  addExpense: (data: Record<string, unknown>) => api.post("/expenses", data),
 };
 
 // ---- Dashboard / Analytics ----

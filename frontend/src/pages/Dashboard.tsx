@@ -1,10 +1,9 @@
-﻿// src/pages/Dashboard.tsx
-import { useMemo, useState } from "react";
+// src/pages/Dashboard.tsx
+import { useMemo, useState, useEffect } from "react";
 import KpiCard from "../components/KpiCard";
 import DataTable from "../components/DataTable";
 import StatusBadge from "../components/StatusBadge";
-import { dashboardKpis, recentTrips, vehicleStatusBreakdown } from "../data/mockData";
-import type { RecentTrip } from "../types";
+import { analyticsApi, tripApi, vehicleApi } from "../services/api";
 
 function FilterSelect({ label }: { label: string }) {
   return (
@@ -16,11 +15,54 @@ function FilterSelect({ label }: { label: string }) {
 
 export default function Dashboard() {
   const [search, setSearch] = useState("");
+  const [stats, setStats] = useState<any>(null);
+  const [recentTripsData, setRecentTripsData] = useState<any[]>([]);
+  const [vehiclesData, setVehiclesData] = useState<any[]>([]);
 
-  const totalVehicles = useMemo(
-    () => vehicleStatusBreakdown.reduce((sum, v) => sum + v.count, 0),
-    []
-  );
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const [statsRes, tripsRes, vehiclesRes] = await Promise.all([
+          analyticsApi.getDashboardStats(),
+          tripApi.getAll(),
+          vehicleApi.getAll()
+        ]);
+        setStats(statsRes.data);
+        setRecentTripsData(tripsRes.data.slice(0, 5)); // show top 5
+        setVehiclesData(vehiclesRes.data);
+      } catch (error) {
+        console.error("Failed to load dashboard data", error);
+      }
+    };
+    fetchData();
+  }, []);
+
+  const dashboardKpis = useMemo(() => {
+    if (!stats) return [];
+    return [
+      { label: "Active Vehicles", value: stats.active_vehicles },
+      { label: "Vehicles in Maintenance", value: stats.vehicles_in_maintenance, accent: "rose" as const },
+      { label: "Active Trips", value: stats.active_trips },
+      { label: "Pending Trips", value: stats.pending_trips, accent: "orange" as const },
+      { label: "Drivers on Duty", value: stats.drivers_on_duty },
+    ];
+  }, [stats]);
+
+  const vehicleStatusBreakdown = useMemo(() => {
+    const breakdown = [
+      { label: "Available", count: 0, color: "#F39F5A", status: "available" },
+      { label: "On Trip", count: 0, color: "#662549", status: "on_trip" },
+      { label: "In Shop", count: 0, color: "#AE445A", status: "in_shop" },
+      { label: "Retired", count: 0, color: "#1D1A39", status: "retired" },
+    ];
+    vehiclesData.forEach(v => {
+      const b = breakdown.find(item => item.status === v.status);
+      if (b) b.count += 1;
+    });
+    return breakdown;
+  }, [vehiclesData]);
+
+  const totalVehicles = vehiclesData.length;
 
   return (
     <div className="p-6 space-y-6">
@@ -58,15 +100,15 @@ export default function Dashboard() {
               RECENT TRIPS
             </h3>
           </div>
-          <DataTable<RecentTrip>
-  data={recentTrips}
+          <DataTable<any>
+  data={recentTripsData}
   keyField="id"
   columns={[
     { key: "trip", header: "Trip", render: (t) => <span className="font-medium text-[#1D1A39]">{t.id}</span> },
-    { key: "vehicle", header: "Vehicle", accessor: (t) => t.vehicle },
-    { key: "driver", header: "Driver", accessor: (t) => t.driver },
+    { key: "vehicle", header: "Vehicle", render: (t) => t.vehicle_id },
+    { key: "driver", header: "Driver", render: (t) => t.driver_id },
     { key: "status", header: "Status", render: (t) => <StatusBadge status={t.status} /> },
-    { key: "eta", header: "ETA", render: (t) => <span className="text-[#451952]/70">{t.eta}</span> },
+    { key: "eta", header: "Origin - Dest", render: (t) => <span className="text-[#451952]/70">{t.origin} - {t.destination}</span> },
   ]}
 />
         </div>
@@ -78,7 +120,7 @@ export default function Dashboard() {
           </h3>
           <div className="space-y-4">
             {vehicleStatusBreakdown.map((v) => {
-              const pct = Math.round((v.count / totalVehicles) * 100);
+              const pct = totalVehicles > 0 ? Math.round((v.count / totalVehicles) * 100) : 0;
               return (
                 <div key={v.label}>
                   <div className="flex justify-between text-xs text-[#1D1A39] mb-1">

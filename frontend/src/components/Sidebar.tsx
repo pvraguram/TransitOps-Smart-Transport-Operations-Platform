@@ -1,4 +1,4 @@
-﻿import { NavLink, useNavigate } from "react-router-dom";
+import { NavLink, useNavigate } from "react-router-dom";
 import {
   LayoutDashboard,
   Truck,
@@ -6,10 +6,8 @@ import {
   Route,
   Wrench,
   Fuel,
-  BarChart3,
   Settings,
   LogOut,
-  Zap,
 } from "lucide-react";
 import { useAuth } from "../hooks/useAuth";
 
@@ -20,7 +18,6 @@ const navItems = [
   { label: "Trips", icon: Route, path: "/trips" },
   { label: "Maintenance", icon: Wrench, path: "/maintenance" },
   { label: "Fuel & Expenses", icon: Fuel, path: "/expenses" },
-  { label: "Analytics", icon: BarChart3, path: "/analytics" },
   { label: "Settings", icon: Settings, path: "/settings" },
 ];
 
@@ -37,7 +34,7 @@ export default function Sidebar() {
     <aside className="w-60 flex-shrink-0 bg-[#1D1A39] flex flex-col h-full">
       <div className="flex items-center gap-3 px-5 py-5 border-b border-white/10">
         <div className="w-9 h-9 rounded-lg bg-[#F39F5A]/20 flex items-center justify-center">
-          <Zap className="w-4.5 h-4.5 text-[#F39F5A]" fill="#F39F5A" />
+          <Truck className="w-4.5 h-4.5 text-[#F39F5A]" fill="#F39F5A" />
         </div>
         <div>
           <p className="text-white font-semibold text-sm leading-tight">TransitOps</p>

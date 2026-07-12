@@ -1,70 +1,84 @@
-﻿import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Wrench, Save, ArrowRight } from "lucide-react";
+import { maintenanceApi, vehicleApi } from "../services/api";
 
-// ---- Palette ----
-// #1D1A39 - deep navy
-// #451952 - deep purple
-// #662549 - wine
-// #AE445A - rose
-// #F39F5A - orange
-// #E8BCB9 - blush
 
-type Status = "In Shop" | "Completed" | "Available";
-
-interface ServiceLog {
-  id: string;
-  vehicle: string;
-  service: string;
-  cost: number;
-  status: Status;
-}
-
-const initialServiceLogs: ServiceLog[] = [
-  { id: "1", vehicle: "VAN-05", service: "Oil Change", cost: 2600, status: "In Shop" },
-  { id: "2", vehicle: "TRUCK-8", service: "Engine Repair", cost: 19000, status: "Completed" },
-  { id: "3", vehicle: "MXD-03", service: "Tyre Replace", cost: 6200, status: "In Shop" },
-];
-
-function StatusPill({ status }: { status: Status }) {
-  const styles: Record<Status, string> = {
-    Available: "bg-emerald-500/15 text-emerald-600 border border-emerald-500/30",
-    "In Shop": "bg-[#F39F5A]/20 text-[#F39F5A] border border-[#F39F5A]/40",
-    Completed: "bg-[#451952]/10 text-[#451952] border border-[#451952]/30",
+function StatusPill({ status }: { status: string }) {
+  const styles: Record<string, string> = {
+    active: "bg-[#F39F5A]/20 text-[#F39F5A] border border-[#F39F5A]/40",
+    completed: "bg-[#451952]/10 text-[#451952] border border-[#451952]/30",
   };
   return (
-    <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${styles[status]}`}>
-      {status}
+    <span className={`px-2.5 py-1 rounded-full text-xs font-semibold capitalize ${styles[status] || ""}`}>
+      {status.replace("_", " ")}
     </span>
   );
 }
 
 export default function Maintenance() {
-  const [serviceLogs, setServiceLogs] = useState<ServiceLog[]>(initialServiceLogs);
+  const [serviceLogs, setServiceLogs] = useState<any[]>([]);
+  const [vehicles, setVehicles] = useState<any[]>([]);
+  const [saving, setSaving] = useState(false);
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
 
-  const [vehicle, setVehicle] = useState("");
-  const [serviceType, setServiceType] = useState("");
+  const [vehicleId, setVehicleId] = useState("");
+  const [serviceType, setServiceType] = useState("routine");
   const [cost, setCost] = useState("");
-  const [date, setDate] = useState("");
-  const [status, setStatus] = useState<Status>("In Shop");
+  const [description, setDescription] = useState("");
 
-  const handleSave = (e: React.FormEvent) => {
+  const loadData = async () => {
+    try {
+      const [maintRes, vehRes] = await Promise.all([
+        maintenanceApi.getAll(),
+        vehicleApi.getAll()
+      ]);
+      setServiceLogs(maintRes.data);
+      setVehicles(vehRes.data);
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!vehicle || !serviceType || !cost) return;
+    const errors: Record<string, string> = {};
+    if (!vehicleId) errors.vehicleId = "Please select a vehicle.";
+    if (!serviceType.trim()) errors.serviceType = "Service type is required.";
+    if (!cost) errors.cost = "Cost is required.";
+    if (Object.keys(errors).length > 0) { setFormErrors(errors); return; }
+    setFormErrors({});
+    setSaving(true);
+    try {
+      await maintenanceApi.create({
+        vehicle_id: Number(vehicleId),
+        date: new Date().toISOString().split("T")[0],
+        type: serviceType,
+        cost: Number(cost),
+        description: description || null
+      });
+      setVehicleId("");
+      setServiceType("routine");
+      setCost("");
+      setDescription("");
+      loadData();
+    } catch (e) {
+      console.error("Failed to add maintenance record", e);
+    } finally {
+      setSaving(false);
+    }
+  };
 
-    const newLog: ServiceLog = {
-      id: Date.now().toString(),
-      vehicle,
-      service: serviceType,
-      cost: Number(cost),
-      status,
-    };
-
-    setServiceLogs([newLog, ...serviceLogs]);
-    setVehicle("");
-    setServiceType("");
-    setCost("");
-    setDate("");
-    setStatus("In Shop");
+  const handleComplete = async (id: number) => {
+    try {
+      await maintenanceApi.updateStatus(id.toString(), "completed");
+      loadData();
+    } catch (e) {
+      console.error("Failed to update status", e);
+    }
   };
 
   return (
@@ -92,24 +106,35 @@ export default function Maintenance() {
               <label className="block text-xs font-semibold text-[#662549] mb-1.5 uppercase">
                 Vehicle
               </label>
-              <input
-                value={vehicle}
-                onChange={(e) => setVehicle(e.target.value)}
-                placeholder="e.g. VAN-05"
-                className="w-full px-3 py-2.5 text-sm border border-[#662549]/20 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#F39F5A]/40"
-              />
+              <select
+              required
+              value={vehicleId}
+              onChange={(e) => { setVehicleId(e.target.value); setFormErrors(p => ({ ...p, vehicleId: "" })); }}
+              className={`w-full px-3 py-2.5 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#F39F5A]/40 bg-white ${formErrors.vehicleId ? "border-red-400" : "border-[#662549]/20"}`}
+            >
+              <option value="">Select vehicle</option>
+              {vehicles.map((v) => (
+                <option key={v.id} value={v.id}>{v.registration_number}</option>
+              ))}
+            </select>
+            {formErrors.vehicleId && <p className="text-xs text-red-500 mt-1">{formErrors.vehicleId}</p>}
             </div>
 
             <div>
               <label className="block text-xs font-semibold text-[#662549] mb-1.5 uppercase">
                 Service Type
               </label>
-              <input
+              <select
+                required
                 value={serviceType}
-                onChange={(e) => setServiceType(e.target.value)}
-                placeholder="e.g. Oil Change"
-                className="w-full px-3 py-2.5 text-sm border border-[#662549]/20 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#F39F5A]/40"
-              />
+                onChange={(e) => { setServiceType(e.target.value); setFormErrors(p => ({ ...p, serviceType: "" })); }}
+                className={`w-full px-3 py-2.5 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#F39F5A]/40 bg-white ${formErrors.serviceType ? "border-red-400" : "border-[#662549]/20"}`}
+              >
+                <option value="routine">Routine</option>
+                <option value="repair">Repair</option>
+                <option value="inspection">Inspection</option>
+              </select>
+              {formErrors.serviceType && <p className="text-xs text-red-500 mt-1">{formErrors.serviceType}</p>}
             </div>
 
             <div>
@@ -117,47 +142,34 @@ export default function Maintenance() {
                 Cost (₹)
               </label>
               <input
+                required
                 value={cost}
-                onChange={(e) => setCost(e.target.value)}
+                onChange={(e) => { setCost(e.target.value); setFormErrors(p => ({ ...p, cost: "" })); }}
                 type="number"
                 placeholder="0"
-                className="w-full px-3 py-2.5 text-sm border border-[#662549]/20 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#F39F5A]/40"
+                className={`w-full px-3 py-2.5 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#F39F5A]/40 ${formErrors.cost ? "border-red-400" : "border-[#662549]/20"}`}
               />
+              {formErrors.cost && <p className="text-xs text-red-500 mt-1">{formErrors.cost}</p>}
             </div>
 
             <div>
               <label className="block text-xs font-semibold text-[#662549] mb-1.5 uppercase">
-                Date
+                Description (Optional)
               </label>
               <input
-                value={date}
-                onChange={(e) => setDate(e.target.value)}
-                type="date"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
                 className="w-full px-3 py-2.5 text-sm border border-[#662549]/20 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#F39F5A]/40"
               />
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-[#662549] mb-1.5 uppercase">
-                Status
-              </label>
-              <select
-                value={status}
-                onChange={(e) => setStatus(e.target.value as Status)}
-                className="w-full px-3 py-2.5 text-sm border border-[#662549]/20 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#F39F5A]/40 bg-white"
-              >
-                <option>In Shop</option>
-                <option>Completed</option>
-                <option>Available</option>
-              </select>
             </div>
 
             <button
               type="submit"
-              className="w-full flex items-center justify-center gap-2 bg-[#F39F5A] text-[#1D1A39] font-semibold text-sm py-2.5 rounded-lg hover:brightness-95 transition"
+              disabled={saving}
+              className="w-full flex items-center justify-center gap-2 bg-[#F39F5A] text-[#1D1A39] font-semibold text-sm py-2.5 rounded-lg hover:brightness-95 transition disabled:opacity-60"
             >
               <Save className="w-4 h-4" />
-              Save
+              {saving ? "Saving..." : "Save"}
             </button>
           </form>
 
@@ -195,22 +207,30 @@ export default function Maintenance() {
           <table className="w-full text-sm">
             <thead>
               <tr className="bg-[#E8BCB9]/20 text-left text-[#662549] text-xs font-semibold uppercase">
-                <th className="px-5 py-3">Vehicle</th>
+                <th className="px-5 py-3">Vehicle ID</th>
                 <th className="px-5 py-3">Service</th>
                 <th className="px-5 py-3">Cost (₹)</th>
                 <th className="px-5 py-3">Status</th>
+                <th className="px-5 py-3">Actions</th>
               </tr>
             </thead>
             <tbody>
               {serviceLogs.map((log) => (
                 <tr key={log.id} className="border-t border-[#662549]/10 hover:bg-[#E8BCB9]/10">
-                  <td className="px-5 py-3 font-medium text-[#1D1A39]">{log.vehicle}</td>
-                  <td className="px-5 py-3 text-[#451952]/80">{log.service}</td>
+                  <td className="px-5 py-3 font-medium text-[#1D1A39]">{log.vehicle_id}</td>
+                  <td className="px-5 py-3 text-[#451952]/80 capitalize">{log.type}</td>
                   <td className="px-5 py-3 font-semibold text-[#1D1A39]">
-                    ₹{log.cost.toLocaleString()}
+                    ₹{log.cost?.toLocaleString() ?? 0}
                   </td>
                   <td className="px-5 py-3">
                     <StatusPill status={log.status} />
+                  </td>
+                  <td className="px-5 py-3">
+                    {log.status === 'active' && (
+                      <button onClick={() => handleComplete(log.id)} className="text-xs text-blue-600 underline">
+                        Mark Done
+                      </button>
+                    )}
                   </td>
                 </tr>
               ))}
